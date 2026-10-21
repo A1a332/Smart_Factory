@@ -1,0 +1,15 @@
+{
+  "name": "Smart_Factory",
+  "mod_reference": "Smart_Factory",
+  "version": "1.0.0",
+  "gameVersion": ">=502094",
+  "friendlyName": "Smart Factory",
+  "description": "Smart Factory console. Place a Wireless Terminal and, without walking anywhere, browse every machine in the world by category with live output and power figures, open any machine's own native UI, pull its output straight into your inventory, and teleport to it. Also maps all alien-energy targets across the map -- power slugs, Mercer spheres, Somersloops and unopened drop pods -- with world coordinates (loaded from a shipped collectibles.json so the whole map shows even in unvisited regions), flags cave-dwelling targets in the list, and can teleport you to any of them.",
+  "authors": [
+    "Monsue"
+  ],
+  "dependencies": {
+    "SML": "^3.12.0",
+    "SmartFactoryLib": "^1.0.0"
+  }
+}
