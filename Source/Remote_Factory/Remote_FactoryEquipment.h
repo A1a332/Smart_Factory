@@ -89,12 +89,54 @@ public:
     void StartVisibilityWatchdog();
     void StopVisibilityWatchdog();
 
-    /** ★0.2.142 终端屏幕显示 Smart Factory logo（白底）：把 HandMesh 的屏幕材质槽（槽名含
-     *  "Screen"，兜底索引 2，DumpedObjects 实锤 OverrideMaterials[2]=ScreenMaterialInstance）
-     *  克隆为 MID，其全部纹理参数指向运行时从 mod 目录加载的 Content/ScreenLogo.png。
+    /** ★0.2.142 终端屏幕显示 Smart Factory logo。
+     *  ★1.0.6 重写为【组件路线】（肥鱼处方②，用户拍板；网格槽 DMI 路线已证死路）：
+     *  在 HandMesh 上挂一块静态网格贴片 ScreenQuadComp（/Engine/BasicShapes/Plane，游戏主
+     *  utoc cooked 实锤），材质用引擎自带 /Engine/EngineMaterials/Widget3DPassThrough_Opaque
+     *  的 MID，纹理参数 SlateUI（引擎源码 WidgetComponent.cpp:1553 实锤）塞运行时导入的
+     *  Content/ScreenLogo.png。三份资产全部游戏已 cooked，零 shader 风险。
+     *  为什么不走槽[2] DMI（1.0.5 日志 + uasset 一手解析实锤）：
+     *  ① 槽[2] 底材质 Material_UI_ObjectScanner 的屏图案是 ObjectScanner_Screen 纹理的
+     *     固定表达式引用（非纹理参数），DMI 塞不进任何纹理（0.2.144 参数化"零变化"根因）；
+     *  ② 自烤 M_ScreenLogo 无 shader（mod pak 不带 shader library，Shipping 禁编译）→
+     *     Can't compile → 默认棋盘格（用户红框截图实锤）。
      *  ★必须在 HandMesh 网格就绪后调用（Equip 赋网格之后 / vigil 材质重置之后）；BeginPlay 时
      *  实例 HandMesh 还没网格（GetNumMaterials()==0，0.2.142 首版教训），不能在 BeginPlay 调。 */
     void ApplyHandheldScreenLogo();
+
+    /** ★1.0.6 屏幕贴片组件（懒创建，见 ApplyHandheldScreenLogo 注释）。挂 HandMesh 下、
+     *  无碰撞、不投影；材质为 Widget3DPassThrough_Opaque 的 MID（SlateUI=logo）。 */
+    UPROPERTY(Transient)
+    TObjectPtr<class UStaticMeshComponent> ScreenQuadComp;
+
+    /** ★1.0.4 死亡守卫：角色是否已死亡（UFGHealthComponent::IsDead，FGHealthComponent.h:137；
+     *  经 AFGCharacterBase::GetHealthComponent，FGCharacterBase.h:210）。角色/血量组件缺失时
+     *  返回 false（按"活着"处理，避免装备期边界态误杀面板）。用于：右键 Toggle 拦截、
+     *  OpenPanel 拒开、面板看门狗死亡自动收面板 —— 三处合围，杜绝面板盖死 Death UI。
+     *  ★1.0.7 扩宽：叠加 AFGPlayerController::NeedRespawn()（FGPlayerController.h:162，BlueprintPure，
+     *  注释原文"true if this player controller needs to respawn it's pawn, e.g. the pawn is dead"）——
+     *  血量组件路径在死亡实测中从未命中过（全部历史会话三道守卫触发数=0），NeedRespawn 是
+     *  控制器层死亡信号，与血量层互为冗余。 */
+    bool IsInstigatorDead() const;
+
+    /** ★1.0.7 控制器层死亡/待复活信号（AFGPlayerController::NeedRespawn）。与 IsInstigatorDead
+     *  分开暴露，供插桩日志区分「血量层死亡」与「控制器待复活」两种状态。 */
+    bool IsControllerAwaitingRespawn() const;
+
+    /** ★1.0.8 【实时】死亡信号（不含粘性标记）：血量层 IsDead() 或控制器层 NeedRespawn()。
+     *  只在本帧真的拿到死亡实证时才为真，用于「代为调用原版 StartRespawn」这类副作用操作——
+     *  粘性标记 bDeathSeen 可能因边界态残留，拿它去触发复活有活体误触发风险，故分级。 */
+    bool IsConfirmedDeadNow() const;
+
+    /** ★1.0.8 死亡锁存更新（非 const；在 Equip / UnEquip / 右键入口调用）。
+     *  根因（1.0.7 局日志 18.41.20 实锤）：死亡瞬间原版 UnEquip 本装备并清掉 Instigator，
+     *  「同一帧内第一次查询 dead=1、第二次查询 dead=0」——查询式检测从死亡第二帧起必然失灵，
+     *  导致后续每次风暴 Equip 都把 priority=10000 的右键 IMC 挂回，右键被输入栈吞掉，
+     *  原版死亡界面永远收不到右键（用户实锤：不拿终端就能正常复活）。
+     *  ⇒ 任何时刻见到死亡信号即刻置位 bDeathSeen（粘性）；只有拿到「活着的实证」
+     *    （Character 在 + Health 在 + !IsDead + !NeedRespawn）才清除。
+     *  bDeathSeen 只用于扣 IMC / 拒绝开面板这类保守行为，绝不用于触发复活。 */
+    void UpdateDeathLatch();
 
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
@@ -165,6 +207,13 @@ protected:
 
     /** ★v0.2.14 面板是否已注册进 FGGameUI 交互栈（含重试状态）。 */
     bool bRegisteredWithGameUI = false;
+
+    /** ★1.0.8 粘性死亡标记：一旦见到死亡信号即置位，直到拿到「活着的实证」才清（见 UpdateDeathLatch）。
+     *  仅用于保守行为：死亡期不挂右键 IMC、拒绝开面板、面板看门狗收面板。不用于触发复活。 */
+    bool bDeathSeen = false;
+
+    /** ★1.0.8 死亡收尾：关面板 + 摘 IMC/Pop 自有 EIC，把右键完整还给原版死亡界面。幂等。 */
+    void HandleDeathDetected();
 
     /** ★v0.2.15 面板看门狗 ticker 句柄（面板关闭时 RemoveTicker 主动停表）。 */
     FTSTicker::FDelegateHandle PanelWatchdogHandle;

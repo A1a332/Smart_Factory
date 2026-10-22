@@ -15,6 +15,20 @@ DEFINE_LOG_CATEGORY(LogRemote_Factory);
  */
 void FRemote_FactoryModule::StartupModule()
 {
+    // ★1.0.5 撤销 1.0.2 的 pak 挂载点补偿（RegisterMountPoint 两条）——实测证明它是**有害**的：
+    // 1.0.4 实测日志 vs 手工部署正常期日志对比实锤：
+    //  - "Mount point ... not mounted to a valid Root Path"（IPlatformFilePak.cpp:6168）对**所有**
+    //    mod（含 SML/AllNodesPure 等正常 mod）都在报，是 pak 层噪音；IoStore 资产走
+    //    LogFilePackageStore "Mounting container"（NumPackages=4）挂载，与该警告无关，两局一致。
+    //  - 1.0.2/1.0.3 加的 RegisterMountPoint("/Smart_Factory/", ".../Mods/Smart_Factory/Content/")
+    //    把磁盘**散装 Content**（uncooked Editor 格式 uasset）映射成了 /Smart_Factory/ 的包供给者，
+    //    LoadObject 命中散装版而非 pak 内 cooked 版 ⇒ "Missing shader resource ... M_ScreenLogo"
+    //    （shader 库无此 hash，Shipping 又不能现场编译）⇒ 默认材质 ⇒ 屏幕米黄。**补偿本身制造了病**。
+    // 正确行为：什么都不注册。IoStore 容器由引擎扫描 Mods/<目录>/Content/Paks/ 挂载（与目录名
+    // 无关），PackageStore 固化了 cook 时的包名 /Smart_Factory/...，LoadObject 直达 cooked 资产。
+    // 若未来用新插件名重烤 pak（包名 /SmartFactory/），需同步改 C++ 加载路径候选，而不是恢复
+    // 这两条注册。
+
     UE_LOG(LogRemote_Factory, Log,
         TEXT("Remote Factory %s loaded: whole-map machine console with live output, native UI, "
              "output pull and teleport; plus a full-map alien-energy browser (from collectibles.json) "

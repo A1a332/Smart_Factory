@@ -205,14 +205,54 @@ void URemote_FactoryRecipe::ApplyIngredients()
 // ----------------------------------------------------------------------------
 // Build category / sub-category
 // ----------------------------------------------------------------------------
+// ★1.0.12：建造分类图标填充 helper。参数是 FSlateBrush 本体引用 —— 自由函数只碰 brush，
+//   不碰任何 protected 成员；赋值 `mCategoryIcon = ...` 由两个派生类构造函数自己做
+//   （protected 成员自由函数直写会 C2248，本文件 SetBuildCategoryProp 注释记着同一坑）。
+static FSlateBrush WT_MakeCategoryIconBrush()
+{
+    FSlateBrush Brush;
+    UTexture2D* Icon = nullptr;
+    static const TCHAR* const IconRoots[] = {
+        TEXT("/Smart_Factory/"),
+        TEXT("/Game/Smart_Factory/"),
+        TEXT("/Remote_Factory/"),
+        TEXT("/Game/Remote_Factory/"),
+        TEXT("/WirelessTerminal/"),          // 改名前祖根（BP 资产内部旧路径兜底，铁律保留）
+        TEXT("/Game/WirelessTerminal/"),
+    };
+    for (const TCHAR* Root : IconRoots)
+    {
+        Icon = LoadObject<UTexture2D>(nullptr,
+            *(FString(Root) + TEXT("Icon/icon_handheld_terminal.icon_handheld_terminal")));
+        if (Icon)
+        {
+            break;
+        }
+    }
+    if (!Icon)
+    {
+        // 无图标时返回默认刷子（什么都不画）= 维持旧行为，但明确告警。
+        WT_WARNF(TEXT("[registry] build-category icon texture not found -- category stays blank."));
+        return Brush;
+    }
+    Brush.SetResourceObject(Icon);
+    Brush.ImageSize = FVector2D(Icon->GetSizeX(), Icon->GetSizeY());
+    Brush.DrawAs = ESlateBrushDrawType::Image;
+    return Brush;
+}
+
 URemote_FactoryBuildCategory::URemote_FactoryBuildCategory()
 {
     mDisplayName = WT_LOCTEXT("Building_Remote_Factory", "智能工厂");
+    // ★1.0.12：UFGCategory::mCategoryIcon 从未被设过 ⇒ 建造枪左栏「智能工厂」一直空白
+    //   （1.0.11 用户截图实锤）。贴图复用里程碑同款 icon_handheld_terminal。
+    mCategoryIcon = WT_MakeCategoryIconBrush();
 }
 
 URemote_FactoryBuildSubCategory::URemote_FactoryBuildSubCategory()
 {
     mDisplayName = WT_LOCTEXT("Building_Remote_Factory", "智能工厂");
+    mCategoryIcon = WT_MakeCategoryIconBrush();
 }
 
 // ----------------------------------------------------------------------------

@@ -6,4 +6,4 @@
 // WirelessPower v1.1.2: the startup banner must never drift from the packaged version).
 // ---------------------------------------------------------------------------------------------
 
-#define REMOTE_FACTORY_VERSION_TEXT TEXT("1.0.0")
+#define REMOTE_FACTORY_VERSION_TEXT TEXT("1.0.12")

@@ -163,10 +163,10 @@ UWTUpgradePowerStorageDescriptor::UWTUpgradePowerStorageDescriptor()
     BuildableClass = AWTUpgradePowerStorage::StaticClass();
     HologramClass = AWTUpgradePowerStorageHologram::StaticClass();
     DisplayName = AWTUpgradePowerStorage::GetDisplayName();
+    // ★1.0.12 中文化 + 数字纠偏（旧文案 1000 MWh 是 0.2.48 提速前的旧数值，实际 1600/400）。
     Desc = WT_LOCTEXT("Desc_UpgradePowerStorage",
-        "A very large battery bank (1000 MWh). Stores the grid's surplus and releases it during "
-        "a shortfall -- the factory-wide total shows up in the readout at the top of the "
-        "Smart Factory.");
+        "一座超大容量电池组（1600 MWh）。存储电网盈余、在缺电时自动释放；"
+        "建成后整座工厂的蓄电总量会显示在智能工厂终端面板顶部。");
     InitCommon();
 }
 
@@ -385,13 +385,14 @@ namespace
         { TEXT("/Game/FactoryGame/Resource/Parts/Wire/Desc_Wire.Desc_Wire_C"), 100 },
     };
 
-    // 储能单元 —— T3 解锁。10 倍电池是笔真投资，按 T3「基础钢铁生产」能自产的件定价：
-    // 钢梁 / 钢管（T3 铸造厂）+ 强化铁板（T0，但 T3 工厂批量产）。
-    // 原来用的钢筋混凝土梁(T4) 与 定子(T4) 对 T3 来说都超了一档。
+    // ★1.0.12（用户定案）：超级蓄电池建造材料 = 原版储能（Power Storage）用料 ×4：
+    //   原版 100×线缆 + 10×多功能框架 + 5×装壳工业梁 ⇒ 400 / 40 / 20。
+    //   路径全部用本 mod 已实机验证过的（装壳工业梁的描述符类名历史上就是 Desc_SteelPlateReinforced，
+    //   不存在 Desc_EncasedIndustrialBeam —— WP v1.0.49 注释与官方 wiki className 双重实锤）。
     const FWTCostLine GStorageUnitCost[] = {
-        { TEXT("/Game/FactoryGame/Resource/Parts/SteelPlate/Desc_SteelPlate.Desc_SteelPlate_C"), 40 },              // T3 钢梁
-        { TEXT("/Game/FactoryGame/Resource/Parts/SteelPipe/Desc_SteelPipe.Desc_SteelPipe_C"), 25 },                 // T3 钢管
-        { TEXT("/Game/FactoryGame/Resource/Parts/IronPlateReinforced/Desc_IronPlateReinforced.Desc_IronPlateReinforced_C"), 30 }, // T0 强化铁板
+        { TEXT("/Game/FactoryGame/Resource/Parts/Wire/Desc_Wire.Desc_Wire_C"), 400 },                       // T0 线缆
+        { TEXT("/Game/FactoryGame/Resource/Parts/ModularFrame/Desc_ModularFrame.Desc_ModularFrame_C"), 40 },// T2 多功能框架
+        { TEXT("/Game/FactoryGame/Resource/Parts/SteelPlateReinforced/Desc_SteelPlateReinforced.Desc_SteelPlateReinforced_C"), 20 }, // T4 装壳工业梁
     };
 
     // 产能加速器 —— T5 解锁，最贵的一件：它替代的是能量碎片（有限的世界资源），
@@ -1198,10 +1199,13 @@ void UWTUpgradeAcceleratorRecipe::ApplyIngredients()
 // ----------------------------------------------------------------------------
 
 // 里程碑造价表。行尾 (T?) 是该物品的解锁层级 —— 改数字时照着这条线看，别越级。
-static const FWTCostLine GMilestoneCostStorage[] = {          // 里程碑 T4
-    { TEXT("/Game/FactoryGame/Resource/Parts/SteelPlate/Desc_SteelPlate.Desc_SteelPlate_C"), 50 },                              // T3 钢梁
+// ★1.0.12（用户定案）：里程碑费用不放大 4 倍，维持原量纲；但旧表第三项「马达(T4)」越级，
+//   与 T3 存储里程碑不符 —— 改为钢管(T3)，与钢板/多功能框架同为 T3 钢铁线，量纲不变。
+//   （建造材料的 ×4 是电池「放置配方」GStorageUnitCost 的事，不在本表。）
+static const FWTCostLine GMilestoneCostStorage[] = {          // 里程碑 T3
+    { TEXT("/Game/FactoryGame/Resource/Parts/SteelPlate/Desc_SteelPlate.Desc_SteelPlate_C"), 50 },                              // T3 钢板
     { TEXT("/Game/FactoryGame/Resource/Parts/SpaceElevatorParts/Desc_SpaceElevatorPart_2.Desc_SpaceElevatorPart_2_C"), 50 },    // T3 多功能框架
-    { TEXT("/Game/FactoryGame/Resource/Parts/Motor/Desc_Motor.Desc_Motor_C"), 30 },                                             // T4 马达
+    { TEXT("/Game/FactoryGame/Resource/Parts/SteelPipe/Desc_SteelPipe.Desc_SteelPipe_C"), 30 },                               // T3 钢管（★1.0.12 替换原 马达 T4）
 };
 
 static const FWTCostLine GMilestoneCostAccelerator[] = {      // 里程碑 T5
@@ -1815,13 +1819,15 @@ FString UWTUpgradeMilestoneBase::InstallCostCategoryAndUnlock(const TArray<FItem
 UWTUpgradeStorageMilestone::UWTUpgradeStorageMilestone()
 {
     // ★v0.2.22 用户定案：T4 → T3（回到 v0.2.2 注释里原本的档位）。
-    // 三样材料都 ≤ T3：钢梁 T3 / 多功能框架 T3 / 马达 T4 —— 马达是 T4 件，但 T4 与 T3 相邻，
-    // 且储能单元的解锁点本就该在"先进钢铁生产"这一档，用户明确要求放 T3。
+    // ★1.0.12 材料 = 原版储能用料×4（线缆 T0 / 多功能框架 T2 / 装壳工业梁 T4）。装壳工业梁是
+    //   T4 件 —— 与旧表马达 T4 同属相邻档容忍，用户明确要求里程碑放 T3，档位不动。
+    // ★1.0.12 文案中文化 + 数字纠偏：旧文案是英文且写的是 1000 MWh/100 MW（0.2.48 提速前的
+    //   旧数值），实际 0.2.48 定案为 1600 MWh / 400 MW。
     mTechTier = 3;
-    mDisplayName = WT_LOCTEXT("Milestone_UpgradeStorage", "智能工厂 · Super Battery");
+    mDisplayName = WT_LOCTEXT("Milestone_UpgradeStorage", "智能工厂 · 超级蓄电池");
     mDescription = WT_LOCTEXT("MilestoneDesc_UpgradeStorage",
-        "Unlocks the Super Battery (1000 MWh, 100 MW charge rate). It links up "
-        "with the terminal and shows up in the terminal's machine list once built.");
+        "解锁超级蓄电池（1600 MWh，充/放 400 MW）。接入电网即可存储全网盈余、在缺电时自动释放；"
+        "建成后整座工厂的蓄电总量会显示在智能工厂终端面板顶部。");
 }
 
 FString UWTUpgradeStorageMilestone::InstallCostAndUnlock()
@@ -1830,8 +1836,10 @@ FString UWTUpgradeStorageMilestone::InstallCostAndUnlock()
     FillIngredients(Costs, GMilestoneCostStorage, UE_ARRAY_COUNT(GMilestoneCostStorage),
                     TEXT("storage milestone"));
 
+    // ★1.0.11 恢复：超级蓄电池配方重新由 T3 存储里程碑发放（撤销 0.2.59b 的"不再发放"）。
+    // MAM 研究轨暂不恢复（用户定案），故电池恒为 1600 MWh / 400 MW 基础档，无等级加成。
     TArray<UClass*> Recipes;
-    // *0.2.59b fully-remove buildings: Super Battery recipe no longer granted by milestone (mod = terminal + shard only).
+    Recipes.Add(UWTUpgradePowerStorageRecipe::StaticClass());
     return InstallCostCategoryAndUnlock(Costs, Recipes);
 }
 
@@ -2139,6 +2147,8 @@ namespace Remote_FactoryUpgrades
 
             // *0.2.59b: upgrade-building recipes retired too (see Live comment). Old saves lose them from
             // the available list (cannot re-craft) but keep already-placed buildings.
+            // ★1.0.11 例外：UWTUpgradePowerStorageRecipe（超级蓄电池）不再 retired —— 改由 T3 存储里程碑
+            // 发放，若仍在此清单会被 prune 掉，故移除（见下方）。
             TArray<TSubclassOf<UFGRecipe>> Retired;
             if (!WT_FEATURE_POWER_SHARD)
             {
@@ -2148,7 +2158,6 @@ namespace Remote_FactoryUpgrades
             Retired.Add(UWTUpgradePowerShardRecipe2::StaticClass());
             Retired.Add(UWTUpgradePowerShardRecipe3::StaticClass());
             Retired.Add(UWTUpgradeStorageRecipe::StaticClass());
-            Retired.Add(UWTUpgradePowerStorageRecipe::StaticClass());
             Retired.Add(UWTUpgradeCloudDownloaderRecipe::StaticClass());
             Retired.Add(UWTUpgradeCloudFluidUploaderRecipe::StaticClass());
             Retired.Add(UWTUpgradeCloudFluidDownloaderRecipe::StaticClass());
@@ -2205,11 +2214,26 @@ namespace Remote_FactoryUpgrades
         }
         // 注意：此处不再因 !bT1Unlocked 直接 return —— 强化碎片配方无论门槛如何都补发（见下）。
 
+        // ★1.0.11 恢复超级蓄电池：T3 存储里程碑（UWTUpgradeStorageMilestone）已重新发放该配方；
+        // 此处加 T3 门槛，保证「已购 T3 的老存档」升级后也能经读档补发拿到，且不提前到 T1 解锁。
+        bool bStorageMilestoneUnlocked = false;
+        {
+            UWorld* World = RM->GetWorld();
+            const AFGSchematicManager* SM = World ? AFGSchematicManager::Get(World) : nullptr;
+            if (SM && SM->IsSchematicPurchased(UWTUpgradeStorageMilestone::StaticClass()))
+            {
+                bStorageMilestoneUnlocked = true;
+            }
+        }
+
         TArray<TSubclassOf<UFGRecipe>> Wanted;
-        // ★0.2.56（用户定案）：整个 mod 只保留「无线终端 + 强化碎片」两样。5 个升级建筑从 mod 彻底移除，
-        // 不再经 Wanted 补发 —— 新存档不会获得，旧存档已购的保留（SaveGame 只增不减）。强化碎片需其合成配方
-        // 才能造，故 PowerShard + PowerShardSynth 一并保留（即「强化碎片」这一样东西）。
+        // ★0.2.56（用户定案）：整个 mod 只保留「无线终端 + 强化碎片」两样，5 个升级建筑（大仓库/云端站/加速器）
+        // 从 mod 彻底移除。★1.0.11 例外：超级蓄电池（UWTUpgradePowerStorageRecipe）恢复，改由 T3 存储里程碑
+        // 发放，此处纳入读档补发清单（门槛=已购 T3，见下方循环）。强化碎片需其合成配方才能造，故
+        // PowerShard + PowerShardSynth 一并保留（即「强化碎片」这一样东西）。
         Wanted.Add(URemote_FactoryEquipRecipe::StaticClass());        // 终端：仍受 T1 门槛约束
+        // ★1.0.11：超级蓄电池配方经 T3 存储里程碑发放；此处纳入读档补发（门槛=已购 T3，不提前到 T1）。
+        Wanted.Add(UWTUpgradePowerStorageRecipe::StaticClass());
         // ★0.2.134 闸门（WT_FEATURE_POWER_SHARD）：关=碎片两条不入 Wanted ⇒ 读档不再无条件补发，
         // 制作台/构造机/量子编码器里不会出现（配合上面 Retired 的 prune，老存档也干净）。
         if (WT_FEATURE_POWER_SHARD)
@@ -2217,8 +2241,9 @@ namespace Remote_FactoryUpgrades
             Wanted.Add(UWTUpgradePowerShardRecipe::StaticClass());        // 强化碎片① 构造机
             Wanted.Add(UWTUpgradePowerShardSynthRecipe::StaticClass());   // 强化碎片② 量子编码器（0.2.39）
         }
-        // ★0.2.56：MAM 研究树（WT_GetAllResearchTrees 已返回空）不再发放任何 WT 科技；里程碑
-        // （AddUnlockRecipes）只给「手持终端 + 强化碎片」。升级建筑三处（里程碑/MAM 树/Wanted）均已去除。
+        // ★0.2.56：MAM 研究树（WT_GetAllResearchTrees 已返回空）不再发放任何 WT 科技；升级建筑（大仓库/
+        // 云端站/加速器）三处（里程碑/MAM 树/Wanted）均已去除。★1.0.11 例外：超级蓄电池改由 T3 存储里程碑
+        // 发放（里程碑处重新列该配方 + 上方 Wanted 读档补发），MAM 仍不恢复（用户定案）。
 
         TArray<TSubclassOf<UFGRecipe>> Missing;
         for (const TSubclassOf<UFGRecipe>& C : Wanted)
@@ -2227,10 +2252,16 @@ namespace Remote_FactoryUpgrades
             {
                 continue;
             }
-            // 装备配方仅在 T1 已解锁时补发；强化碎片两条配方无视门槛、始终补发。
+            // 装备配方仅在 T1 已解锁时补发；强化碎片两条配方无视门槛、始终补发；
+            // 超级蓄电池仅在「T3 存储里程碑已购」时补发（不提前到 T1）。
             const bool bIsShard = (C == UWTUpgradePowerShardRecipe::StaticClass())
                                || (C == UWTUpgradePowerShardSynthRecipe::StaticClass());
-            if (!bT1Unlocked && !bIsShard)
+            const bool bIsStorage = (C == UWTUpgradePowerStorageRecipe::StaticClass());
+            if (bIsStorage)
+            {
+                if (!bStorageMilestoneUnlocked) continue;
+            }
+            else if (!bT1Unlocked && !bIsShard)
             {
                 continue;
             }

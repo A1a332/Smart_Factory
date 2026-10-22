@@ -4,9 +4,11 @@
 #include "Remote_FactoryLog.h"
 #include "Remote_FactoryCrashTrace.h"
 #include "Remote_FactoryPanelWidget.h"
+#include "Remote_FactoryVersion.h"   // ★1.0.12 启动横幅/诊断日志统一用单源版本宏，杜绝硬编码版本串断言误报
 
 #include "Resources/FGEquipmentDescriptor.h"   // declared under Resources/, not Equipment/
 #include "FGCharacterPlayer.h"
+#include "FGHealthComponent.h"   // ★1.0.4 死亡守卫：UFGHealthComponent::IsDead（inline，需完整定义）
 #include "FGAnimPlayer.h"          // ★0.2.87 3P 举持姿势诊断：UFGAnimPlayer::mArmSlotType
 #include "FGPlayerController.h"
 #include "GameFramework/PlayerController.h"   // ★v0.2.75b GetPlayerViewPoint（显式包含，不依赖 FGPlayerController.h 传递）
@@ -17,10 +19,24 @@
 #include "UObject/UObjectIterator.h"          // ★0.2.48 TObjectIterator（不靠 EngineUtils.h 间接包含）
 #include "Engine/Texture2D.h"
 #include "Misc/Paths.h"                       // ★0.2.142 FPaths::ProjectModsDir / Combine（运行时定位 mod 目录 logo 文件）
+#include "Misc/FileHelper.h"                  // ★1.0.9 FFileHelper::LoadFileToString（ScreenQuad.ini 热调参，Collectibles.cpp 同款）
 #include "Materials/MaterialInstanceDynamic.h"   // ★0.2.142 终端屏幕 logo：克隆屏幕材质为 MID
 #include "Materials/MaterialInstance.h"           // ★0.2.142 UMaterialInstance::TextureParameterValues（public，运行时枚举屏幕材质真实纹理参数名）
 #include "Materials/MaterialInterface.h"          // ★0.2.144 GetAllTextureParameterInfo/GetAllVectorParameterInfo（runtime 枚举，UMaterial/MIC 通吃）+ FMaterialParameterInfo
-#include "Materials/Material.h"                     // ★0.2.145 自烤白底屏材质 M_ScreenLogo：LoadObject<UMaterial>
+#include "Materials/Material.h"                     // UMaterial 完整定义（★1.0.6 起屏贴片改组件路线，此 include 保留兜底；自烤 M_ScreenLogo 路线已废弃——无 shader）
+#include "Engine/SkeletalMesh.h"                    // ★1.0.6 USkeletalMesh::GetBounds（屏幕贴片定位，SkeletalMesh.h:849 一手实锤）
+#include "Math/BoxSphereBounds.h"                   // ★1.0.6 FBoxSphereBounds 完整定义（Core/Public/Math，本引擎无 Engine/BoxSphereBounds.h——首版路径踩坑）
+// ★1.0.10 从原版骨骼网格渲染数据读屏幕面真实几何（取代 INI 猜测式定位）：
+//   一手核实（E:/Unreal Engine - CSS/Engine/Source 头文件）：
+//   FSkeletalMeshRenderData::LODRenderData(TIndirectArray) / FSkeletalMeshLODRenderData
+//   {RenderSections(TArray<FSkelMeshRenderSection>), StaticVertexBuffers(FStaticMeshVertexBuffers)}
+//   FSkelMeshRenderSection{ MaterialIndex, BaseVertexIndex, NumVertices, BaseIndex, NumTriangles }
+//   FStaticMeshVertexBuffers{ StaticMeshVertexBuffer, PositionVertexBuffer }
+//   FPositionVertexBuffer::VertexPosition(uint32)->FVector3f / FStaticMeshVertexBuffer::VertexTangentZ(uint32)->FVector4f
+//   USkeletalMesh::GetResourceForRendering()->FSkeletalMeshRenderData*（SkeletalMesh.h:744 一手实锤）
+#include "Rendering/SkeletalMeshRenderData.h"
+#include "Rendering/PositionVertexBuffer.h"
+#include "Math/RotationMatrix.h"                     // FRotationMatrix::MakeFromXZ(U,N) 手性已核：NewX=U NewZ=N NewY=N^U NewX×NewY=N
 #include "Kismet/KismetRenderingLibrary.h"        // ★0.2.142 ImportFileAsTexture2D（运行时从 mod 目录加载 logo 贴图，无需 cook）
 #include "Engine/GameViewportClient.h"   // ★v0.2.50：EMouseLockMode / FInputModeGameAndUI::SetLockMouseToViewportBehavior
 #include "TimerManager.h"          // ★0.2.48 面板绑定延时重试（FTimerHandle / SetTimer）
@@ -36,6 +52,7 @@
 #include "Animation/AnimSequence.h"    // ★0.2.89 UAnimSequence::AdditiveAnimType 诊断
 #include "Containers/Ticker.h"
 #include "HAL/IConsoleManager.h"        // ★0.2.115 rf.3pArmSlot 运行时开关（FAutoConsoleVariableRef）
+#include "HAL/FileManager.h"            // ★1.0.4 IFileManager::FileExists（logo PNG 候选目录探测，避免导入失败刷 LogStreaming 警告）
 #include "UI/FGGameUI.h"
 
 // ★v0.2.12 右键开面板的 Enhanced Input 三件套
@@ -551,6 +568,14 @@ void ARemote_FactoryEquipment::Equip(AFGCharacterPlayer* Character)
     // 0.2.78-0.2.79 的间歇隐身与地上孤儿，正是手写挂接/看门狗与原生可见性管理互相踩踏的
     // 产物——手写逻辑全部退役，不再与原生打架。
     WT_ZONE_COARSE(TEXT("Equip.Equip"));
+    // ★1.0.8 死亡锁存：死亡瞬间原版清 Instigator 会让查询式检测从第二帧起失灵，故每次入口
+    // 先跑一次锁存（粘性置位 / 活体实证清除），再打插桩。
+    UpdateDeathLatch();
+    // ★1.0.7 死亡风暴插桩：1.0.6 局 18:12.12-15 出现死亡期 UnEquip/Equip ×5 风暴（1.0.4 局
+    // 16:55 同款 30 秒 ×20 轮），原版是否在死亡态给我们上装、以及 Health->IsDead 与
+    // NeedRespawn 两路信号谁亮，全靠这一行定性。★1.0.8 增加 latch（粘性死亡标记）。
+    WT_WARNF(TEXT("[equip] Equip: dead=%d needRespawn=%d latch=%d"),
+             IsInstigatorDead(), IsControllerAwaitingRespawn(), bDeathSeen ? 1 : 0);
     // ★0.2.111 每次装备重新收集骨骼 scale 异常命中（去重数组清空）。
     GWT_ScaleHit3P.Reset();
     GWT_ScaleHitEquip.Reset();
@@ -1633,24 +1658,26 @@ void ARemote_FactoryEquipment::BeginPlay()
     //   才赋上，改由 Equip（网格就绪后）与 vigil 材质重置后调用 ApplyHandheldScreenLogo()。
 }
 
-// ★0.2.142 终端屏幕显示 Smart Factory logo（白底）。
-//   ★0.2.144 重写（大肥鱼处方 A+B，槽位认知已按一手 DumpedObjects 修正）：
-//   ★0.2.145 换底方案（用户拍板"自烤白底材质"）：
-//   SK_ObjectScanner_01 网格 3 材质槽【槽名与实际内容错位】：
-//     [0] ObjectScanner -> MI_ObjectScanner_01       （机身，跳过）
-//     [1] ScreenMat     -> MI_GlassBuilding_Inst     （名"屏幕"实为玻璃 MIC，跳过）
-//     [2] GlassMat      -> Material_UI_ObjectScanner （名"玻璃"实为 UI 材质 = 真屏面）
-//   0.2.144 用"参数化清白"贴 [1]+[2]，但 [2] 的琥珀色是 Material_UI_ObjectScanner 的
-//   【烘焙常数】（vec=0，参数层物理不可达）⇒ 屏幕照旧琥珀。故本版改为：
-//   ★只对 [2] 真屏面（底材质名含 "Material_UI_ObjectScanner"）整体替换为我们自烤的
-//     无光照材质 M_ScreenLogo（/Smart_Factory/Materials/M_ScreenLogo，由编辑器 Python 烘焙、
-//     Alpakit 重烤进 pak）；M_ScreenLogo 仅一个纹理参数 "ScreenTex" → 自发光，
-//     白色物理可达（白底靠 ScreenLogo.png 自身，不再依赖材质常数）。
-//     [0]/[1] 保持原版外观，不再误贴（0.2.144 把玻璃槽贴白是副作用）。
-//   ★回退：若 M_ScreenLogo 加载失败（部署漏带烘焙材质），退回 0.2.144 参数化兜底
-//     （克隆底材质→纹理全指 logo、向量清白），至少不比原版差。
+// ★0.2.142 终端屏幕显示 Smart Factory logo。
+//   ★1.0.6 组件路线（肥鱼处方②定案，用户拍板"现问题的解决版本就是这个"）：
+//   不再改任何网格材质槽 —— 在 HandMesh 下挂一块静态网格贴片 ScreenQuadComp：
+//     网格   = /Engine/BasicShapes/Plane                （游戏主 FactoryGame-Windows.utoc cooked 命中，一手实锤）
+//     材质   = /Engine/EngineMaterials/Widget3DPassThrough_Opaque 的 MID
+//              （引擎 cooked；纹理参数 SlateUI —— WidgetComponent.cpp:1553 引擎源码实锤）
+//     纹理   = 运行时导入的 Mods/<ModDir>/Content/ScreenLogo.png（散装部署，无需 cook）
+//   三份资产全部游戏已 cooked，零 shader 风险；1P/3P 跟随 HandMesh（挂其子级）。
+//   为什么不走槽[2] DMI（1.0.5 日志 + uasset strings 一手解析实锤）：
+//   ① Material_UI_ObjectScanner 的屏图案是 ObjectScanner_Screen 纹理的【固定表达式引用】
+//     （非纹理参数）→ DMI 塞不进任何纹理（0.2.144 参数化"零变化"的根因）；
+//   ② 自烤 M_ScreenLogo 无 shader（mod pak 不带 shader library，Shipping 禁编译）→
+//     "Can't compile M_ScreenLogo" → 默认棋盘格（用户红框截图实锤）。
+//   ★定位（★1.0.10 重写）：不再用常量/INI 猜测。直接读 HandMesh 骨骼网格 LOD0 渲染数据中
+//   MaterialIndex==2（Material_UI_ObjectScanner = 屏幕 UI 面，一手核实槽[2]）的全部 section
+//   顶点，求 质心(定位) / 平均法线(朝向) / 面内主轴+extents(尺寸+旋转)，自动贴合原版屏幕面。
+//   读不到(位置 CPU 数据被 cooked 剥离)则回退 bounds 推导；INI 降为「按 key 覆盖对应分量」细调逃生口
+//   （详见下方 [screen] quad 定位区）。读不到时日志会明确打印 "geom/bounds" 与失败原因。
 //   ★不调用 AFGObjectScanner::BeginPlay（扫描副作用），零扫描副作用。
-//   ★调用时机：HandMesh 网格就绪之后（Equip 赋网格后 / vigil 材质重置后）。
+//   ★调用时机：HandMesh 网格就绪之后（Equip 赋网格后 / vigil 材质重置后）；幂等可重入。
 void ARemote_FactoryEquipment::ApplyHandheldScreenLogo()
 {
     if (!HandMesh || HandMesh->GetNumMaterials() == 0)
@@ -1660,103 +1687,256 @@ void ARemote_FactoryEquipment::ApplyHandheldScreenLogo()
         return;
     }
 
-    // ★散装白底 logo（512x512 白底 PNG），随 Content 镜像部署，运行时载入
-    const FString LogoPath = FPaths::Combine(FPaths::ProjectModsDir(),
-                                             TEXT("Smart_Factory/Content/ScreenLogo.png"));
-    UTexture2D* LogoTex = UKismetRenderingLibrary::ImportFileAsTexture2D(this, LogoPath);
+    // ★散装白底 logo（512x512 白底 PNG），随 Content 镜像部署，运行时载入。
+    // ★1.0.4 修（SMM 首测实锤）：候选列表依次探测（IFileManager::FileExists 前置判定，
+    //   避免 ImportFileAsTexture2D 失败时 LogStreaming/LogImageUtils 刷屏）；新名在前、旧名兜底。
+    const TCHAR* ModDirNames[] = { TEXT("SmartFactory"), TEXT("Smart_Factory") };
+    UTexture2D* LogoTex = nullptr;
+    FString LogoPath;
+    for (const TCHAR* ModDir : ModDirNames)
+    {
+        const FString Candidate = FPaths::Combine(
+            FPaths::ProjectModsDir(), ModDir, TEXT("Content/ScreenLogo.png"));
+        if (IFileManager::Get().FileExists(*Candidate))
+        {
+            LogoTex = UKismetRenderingLibrary::ImportFileAsTexture2D(this, Candidate);
+            LogoPath = Candidate;
+            break;
+        }
+    }
     if (!LogoTex)
     {
-        WT_WARNF(TEXT("[screen] logo texture load FAILED (file missing?): %s"), *LogoPath);
+        WT_WARNF(TEXT("[screen] logo texture load FAILED (file missing?): tried %s and %s"),
+                 *FPaths::Combine(FPaths::ProjectModsDir(), TEXT("SmartFactory/Content/ScreenLogo.png")),
+                 *FPaths::Combine(FPaths::ProjectModsDir(), TEXT("Smart_Factory/Content/ScreenLogo.png")));
         return;
     }
 
-    // ★0.2.145 自烤白底材质（编辑器 Python 烘焙，包名 /Smart_Factory/Materials）
-    UMaterial* ScreenBaseMat = LoadObject<UMaterial>(
-        nullptr, TEXT("/Smart_Factory/Materials/M_ScreenLogo.M_ScreenLogo"));
-    if (!ScreenBaseMat)
+    // ★1.0.6 引擎 cooked 资产（一手实锤，见函数头注释）
+    UStaticMesh* QuadMesh = LoadObject<UStaticMesh>(
+        nullptr, TEXT("/Engine/BasicShapes/Plane.Plane"));
+    UMaterialInterface* QuadMat = LoadObject<UMaterialInterface>(
+        nullptr, TEXT("/Engine/EngineMaterials/Widget3DPassThrough_Opaque.Widget3DPassThrough_Opaque"));
+    if (!QuadMesh || !QuadMat)
     {
-        WT_WARNF(TEXT("[screen] M_ScreenLogo load FAILED (baked material missing?) -> fallback to 0.2.144 param logo"));
+        WT_WARNF(TEXT("[screen] engine assets load FAILED: plane=%d mat=%d"),
+                 QuadMesh ? 1 : 0, QuadMat ? 1 : 0);
+        return;
     }
 
-    const TArray<FName> SlotNames = HandMesh->GetMaterialSlotNames();
-    int32 Applied = 0;
-    for (int32 i = 0; i < HandMesh->GetNumMaterials(); ++i)
+    // MID：复用（贴片已挂则直接刷新 SlateUI，防反复 Create 链式累积）
+    UMaterialInstanceDynamic* MID = ScreenQuadComp
+        ? Cast<UMaterialInstanceDynamic>(ScreenQuadComp->GetMaterial(0))
+        : nullptr;
+    if (!MID || MID->Parent != QuadMat)
     {
-        UMaterialInterface* Base = HandMesh->GetMaterial(i);
-        if (!Base)
-        {
-            continue;
-        }
+        MID = UMaterialInstanceDynamic::Create(QuadMat, this);
+    }
+    MID->SetTextureParameterValue(FName(TEXT("SlateUI")), LogoTex);
 
-        // ★复用：已是我们放的 M_ScreenLogo MID 则直接复用并刷新纹理（避免反复 Create 链式累积）
-        if (UMaterialInstanceDynamic* Existing = Cast<UMaterialInstanceDynamic>(Base))
+    // 贴片组件（懒创建；幂等重挂）
+    if (!ScreenQuadComp)
+    {
+        ScreenQuadComp = NewObject<UStaticMeshComponent>(this);
+        ScreenQuadComp->SetStaticMesh(QuadMesh);
+        ScreenQuadComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        ScreenQuadComp->SetCastShadow(false);
+        ScreenQuadComp->SetupAttachment(HandMesh);
+        ScreenQuadComp->RegisterComponent();
+    }
+    ScreenQuadComp->AttachToComponent(HandMesh, FAttachmentTransformRules::KeepRelativeTransform);
+    ScreenQuadComp->SetMaterial(0, MID);
+    ScreenQuadComp->SetVisibility(true);
+
+    // ── [screen] quad 定位区（★1.0.10 从原版网格 section[2] 真实几何自动对齐）──────
+    // 用户处方（"别去猜，直接看原版扫描仪屏幕位置"）：读 HandMesh 骨骼网格 LOD0 渲染数据中
+    // MaterialIndex==2（Material_UI_ObjectScanner = 屏幕 UI 面，一手核实槽[2]）的全部 section
+    // 顶点，求 质心(定位) / 平均法线(朝向) / 面内主轴+extents(尺寸+旋转)，取代 1.0.9 的 INI 猜测。
+    // 读不到(位置 CPU 数据被 cooked 剥离)则回退到 bounds 推导；INI 降为「按 key 覆盖对应分量」的细调逃生口。
+    const USkeletalMesh* ScreenMeshAsset = HandMesh->GetSkeletalMeshAsset();
+    const FBoxSphereBounds LB = ScreenMeshAsset
+        ? ScreenMeshAsset->GetBounds()
+        : FBoxSphereBounds(FVector::ZeroVector, FVector(20.0f, 20.0f, 20.0f), 20.0f);
+    const FVector Ctr = LB.Origin;    // 局部空间中心（bounds 兜底用）
+    const FVector Ext = LB.BoxExtent; // 局部空间半尺寸（bounds 兜底用）
+
+    // 默认（几何读取失败 / 无 ini 时）的 bounds 兜底值（与 1.0.9 同逻辑）
+    FVector RelPos(Ctr.X, Ctr.Y - Ext.Y * 1.02f, Ctr.Z + Ext.Z * 0.10f);
+    FRotator RelRot(0.f, 0.f, 90.f);          // Plane 法线 +Z → Roll90 → 朝 -Y
+    FVector2D RelSize(Ext.X * 0.55f, Ext.Z * 0.42f);
+    bool bGeomOK = false;
+    FString GeomDiag = TEXT("n/a");
+
+    // ── 尝试从渲染数据读真实几何 ──────────────────────────────────────────────
+    if (ScreenMeshAsset)
+    {
+        const FSkeletalMeshRenderData* RD = ScreenMeshAsset->GetResourceForRendering();
+        if (RD && RD->LODRenderData.Num() > 0)
         {
-            if (ScreenBaseMat && Existing->Parent == ScreenBaseMat)
+            const FSkeletalMeshLODRenderData& LOD = RD->LODRenderData[0];
+            const FPositionVertexBuffer& PVB = LOD.StaticVertexBuffers.PositionVertexBuffer;
+            // ★cooked 构建可能剥掉位置缓冲的 CPU 数据 ⇒ 必须先判空再读，绝不裸读空 Data 指针
+            if (PVB.GetVertexData() != nullptr)
             {
-                Existing->SetTextureParameterValue(FName(TEXT("ScreenTex")), LogoTex);
-                HandMesh->SetMaterial(i, Existing);
-                ++Applied;
-                continue;
+                const FStaticMeshVertexBuffer& SVB = LOD.StaticVertexBuffers.StaticMeshVertexBuffer;
+                TArray<int32> SecMat2;   // 收集 material==2（屏幕 UI 面）的 section
+                for (int32 s = 0; s < LOD.RenderSections.Num(); ++s)
+                {
+                    if (LOD.RenderSections[s].MaterialIndex == 2)
+                    {
+                        SecMat2.Add(s);
+                    }
+                }
+                int32 TotalVerts = 0;
+                for (int32 s : SecMat2)
+                {
+                    TotalVerts += (int32)LOD.RenderSections[s].NumVertices;
+                }
+                if (SecMat2.Num() > 0 && TotalVerts > 0)
+                {
+                    FVector Centroid = FVector::ZeroVector;
+                    FVector NormalSum = FVector::ZeroVector;
+                    int32 nv = 0;
+                    // pass1：质心 + 平均法线（tangent Z）
+                    for (int32 s : SecMat2)
+                    {
+                        const FSkelMeshRenderSection& Sec = LOD.RenderSections[s];
+                        for (uint32 i = 0; i < Sec.NumVertices; ++i)
+                        {
+                            const uint32 vi = Sec.BaseVertexIndex + i;
+                            const FVector3f& P3 = PVB.VertexPosition(vi);
+                            Centroid += FVector((double)P3.X, (double)P3.Y, (double)P3.Z);
+                            const FVector4f& T4 = SVB.VertexTangentZ(vi);
+                            NormalSum += FVector((double)T4.X, (double)T4.Y, (double)T4.Z);
+                            ++nv;
+                        }
+                    }
+                    Centroid /= (float)nv;
+                    const FVector N = NormalSum.GetSafeNormal();
+                    // 面内初轴：以 mesh 局部 +Z 投影为 a0，退化则换 +X
+                    FVector a0 = FVector(0.f, 0.f, 1.f) - (FVector(0.f, 0.f, 1.f) | N) * N;
+                    if (a0.SizeSquared() < 1e-6f)
+                    {
+                        a0 = FVector(1.f, 0.f, 0.f) - (FVector(1.f, 0.f, 0.f) | N) * N;
+                    }
+                    a0.Normalize();
+                    const FVector b0 = (N ^ a0).GetSafeNormal();
+                    // 协方差 → 主轴方向（屏幕「长边」），保证 logo 宽边贴合屏幕长边
+                    double cxx = 0.0, cyy = 0.0, cxy = 0.0;
+                    for (int32 s : SecMat2)
+                    {
+                        const FSkelMeshRenderSection& Sec = LOD.RenderSections[s];
+                        for (uint32 i = 0; i < Sec.NumVertices; ++i)
+                        {
+                            const uint32 vi = Sec.BaseVertexIndex + i;
+                            const FVector3f& P3 = PVB.VertexPosition(vi);
+                            const FVector d = FVector((double)P3.X, (double)P3.Y, (double)P3.Z) - Centroid;
+                            const double u = d | a0;
+                            const double v = d | b0;
+                            cxx += u * u; cyy += v * v; cxy += u * v;
+                        }
+                    }
+                    const double theta = 0.5 * FMath::Atan2(2.0 * cxy, cxx - cyy);
+                    const FVector U = (FMath::Cos((float)theta) * a0 + FMath::Sin((float)theta) * b0).GetSafeNormal();
+                    const FVector V = (N ^ U).GetSafeNormal();
+                    // 沿 U/V 的精确 extents
+                    const float BIG = 3.4e38f;
+                    float minU = BIG, maxU = -BIG, minV = BIG, maxV = -BIG;
+                    for (int32 s : SecMat2)
+                    {
+                        const FSkelMeshRenderSection& Sec = LOD.RenderSections[s];
+                        for (uint32 i = 0; i < Sec.NumVertices; ++i)
+                        {
+                            const uint32 vi = Sec.BaseVertexIndex + i;
+                            const FVector3f& P3 = PVB.VertexPosition(vi);
+                            const FVector d = FVector((double)P3.X, (double)P3.Y, (double)P3.Z) - Centroid;
+                            const float u = (float)(d | U);
+                            const float v = (float)(d | V);
+                            minU = FMath::Min(minU, u); maxU = FMath::Max(maxU, u);
+                            minV = FMath::Min(minV, v); maxV = FMath::Max(maxV, v);
+                        }
+                    }
+                    const float W = maxU - minU;
+                    const float H = maxV - minV;
+                    const float SurfaceOffsetCm = 0.8f;   // 沿法线微抬防 z-fighting（屏幕表面前）
+                    RelPos = Centroid + N * SurfaceOffsetCm;
+                    RelRot = FRotationMatrix::MakeFromXZ(U, N).Rotator();  // 平面 +X→U(宽) +Z→N(法线朝外)
+                    RelSize = FVector2D(W, H);
+                    bGeomOK = true;
+                    GeomDiag = FString::Printf(
+                        TEXT("sectionsMat2=%d nv=%d ctr=%s N=%s U=%s size=%.1fx%.1f"),
+                        SecMat2.Num(), nv, *Centroid.ToString(), *N.ToString(),
+                        *U.ToString(), W, H);
+                }
+                else
+                {
+                    GeomDiag = TEXT("no material-2 section / 0 verts → bounds fallback");
+                }
             }
-        }
-
-        // ★只命中真屏面：底材质是 Material_UI_ObjectScanner（琥珀烘焙常数，参数不可达）
-        const bool bTrueScreen = Base->GetPathName().Contains(TEXT("Material_UI_ObjectScanner"));
-        if (!bTrueScreen)
-        {
-            continue;  // [0] 机身 / [1] 玻璃 MIC：保持原版外观，不再误贴
-        }
-
-        if (ScreenBaseMat)
-        {
-            // ★真屏面 → 整体替换为自烤白底 M_ScreenLogo（Unlit + "ScreenTex"→自发光）
-            UMaterialInstanceDynamic* NewMID = UMaterialInstanceDynamic::Create(ScreenBaseMat, this);
-            NewMID->SetTextureParameterValue(FName(TEXT("ScreenTex")), LogoTex);
-            HandMesh->SetMaterial(i, NewMID);
-            ++Applied;
-            WT_WARNF(TEXT("[screen] 0.2.153 white M_ScreenLogo applied: slot=%d(%s) base=%s path=%s"),
-                     i, *(SlotNames.IsValidIndex(i) ? SlotNames[i].ToString() : FString()),
-                     *Base->GetName(), *LogoPath);
+            else
+            {
+                GeomDiag = TEXT("position CPU data null (cooked stripped) → bounds fallback");
+            }
         }
         else
         {
-            // ★回退：M_ScreenLogo 缺失，用 0.2.144 参数化兜底（克隆底材质→纹理全指 logo、向量清白）
-            UMaterialInstanceDynamic* FallMID = UMaterialInstanceDynamic::Create(Base, this);
-            TArray<FMaterialParameterInfo> TexInfos, VecInfos, DVecInfos, ScalarInfos;
-            TArray<FGuid> Ids;
-            Base->GetAllTextureParameterInfo(TexInfos, Ids);
-            Base->GetAllVectorParameterInfo(VecInfos, Ids);
-            Base->GetAllDoubleVectorParameterInfo(DVecInfos, Ids);
-            Base->GetAllScalarParameterInfo(ScalarInfos, Ids);
-            for (const FMaterialParameterInfo& TI : TexInfos)
-            {
-                FallMID->SetTextureParameterValue(TI.Name, LogoTex);
-            }
-            if (TexInfos.Num() == 0)
-            {
-                FallMID->SetTextureParameterValue(FName(TEXT("ScreenTexture")), LogoTex);
-                FallMID->SetTextureParameterValue(FName(TEXT("Texture")), LogoTex);
-            }
-            for (const FMaterialParameterInfo& VI : VecInfos)
-            {
-                FallMID->SetVectorParameterValue(VI.Name, FLinearColor::White);
-            }
-            for (const FMaterialParameterInfo& DI : DVecInfos)
-            {
-                FallMID->SetDoubleVectorParameterValue(DI.Name, FVector4(1.0, 1.0, 1.0, 1.0));
-            }
-            HandMesh->SetMaterial(i, FallMID);
-            ++Applied;
-            WT_WARNF(TEXT("[screen] fallback param-logo applied: slot=%d base=%s tex=%d vec=%d"),
-                     i, *Base->GetName(), TexInfos.Num(), VecInfos.Num());
+            GeomDiag = TEXT("no render data → bounds fallback");
         }
     }
-
-    if (Applied == 0)
+    else
     {
-        WT_WARNF(TEXT("[screen] no TRUE screen slot (Material_UI_ObjectScanner) found (num=%d)"),
-                 HandMesh->GetNumMaterials());
+        GeomDiag = TEXT("no skeletal mesh asset → bounds fallback");
     }
+
+    // ── INI 细调（按 key 覆盖对应分量；缺省=几何/bounds 兜底值）────────────────────
+    // ★1.0.10：INI 由「整体猜测」降级为「逃生口」——几何读取成功时默认完全由几何决定，
+    //   仅当某 key 显式填写时才覆盖该分量（定位/旋转/尺寸任一可单独钉死微调）。
+    bool bIniLoaded = false;
+    FString IniPathUsed;
+    for (const TCHAR* ModDir : ModDirNames)
+    {
+        const FString IniPath = FPaths::Combine(FPaths::ProjectModsDir(), ModDir, TEXT("ScreenQuad.ini"));
+        FString IniText;
+        if (!FFileHelper::LoadFileToString(IniText, *IniPath))
+        {
+            continue;
+        }
+        bIniLoaded = true;
+        IniPathUsed = IniPath;
+        TArray<FString> Lines;
+        IniText.ParseIntoArrayLines(Lines);
+        for (const FString& Line : Lines)
+        {
+            FString Key, Val;
+            if (!Line.Split(TEXT("="), &Key, &Val))
+            {
+                continue;
+            }
+            Key = Key.TrimStartAndEnd();
+            Val = Val.TrimStartAndEnd();
+            const float V = FCString::Atof(*Val);
+            if      (Key.Equals(TEXT("OffsetX"), ESearchCase::IgnoreCase)) { RelPos.X = V; }
+            else if (Key.Equals(TEXT("OffsetY"), ESearchCase::IgnoreCase)) { RelPos.Y = V; }
+            else if (Key.Equals(TEXT("OffsetZ"), ESearchCase::IgnoreCase)) { RelPos.Z = V; }
+            else if (Key.Equals(TEXT("Yaw"),     ESearchCase::IgnoreCase)) { RelRot.Yaw = V; }
+            else if (Key.Equals(TEXT("Pitch"),   ESearchCase::IgnoreCase)) { RelRot.Pitch = V; }
+            else if (Key.Equals(TEXT("Roll"),    ESearchCase::IgnoreCase)) { RelRot.Roll = V; }
+            else if (Key.Equals(TEXT("Width"),   ESearchCase::IgnoreCase)) { RelSize.X = V; }
+            else if (Key.Equals(TEXT("Height"),  ESearchCase::IgnoreCase)) { RelSize.Y = V; }
+        }
+        break; // 命中第一个存在的 ini 即止（新名优先）
+    }
+
+    // Plane 网格在自身 XY 平面（X=宽沿、Y=高沿），本体 100cm ⇒ 非均匀缩放 (W/100,H/100,1)
+    ScreenQuadComp->SetRelativeLocationAndRotation(RelPos, RelRot);
+    ScreenQuadComp->SetRelativeScale3D(FVector(RelSize.X / 100.0f, RelSize.Y / 100.0f, 1.0f));
+    // ────────────────────────────────────────────────────────────────────────
+
+    WT_WARNF(TEXT("[screen] %s quad: src=%s %s loc=%s rot(P%d Y%d R%d) size=%.1fx%.1fcm ini=%d(%s) tex=%s"),
+             REMOTE_FACTORY_VERSION_TEXT,
+             bGeomOK ? TEXT("geom") : TEXT("bounds"), *GeomDiag, *RelPos.ToString(),
+             (int32)RelRot.Pitch, (int32)RelRot.Yaw, (int32)RelRot.Roll,
+             RelSize.X, RelSize.Y, bIniLoaded ? 1 : 0, *IniPathUsed, *LogoPath);
 }
 
 void ARemote_FactoryEquipment::AddEquipmentActionBindings()
@@ -2228,6 +2408,12 @@ void ARemote_FactoryEquipment::StopPanelWatchdog()
 void ARemote_FactoryEquipment::UnEquip()
 {
     WT_ZONE_COARSE(TEXT("Equip.UnEquip"));
+    // ★1.0.8 死亡锁存（与 Equip 同款）：死亡瞬间本函数被调用时 Instigator 尚在（1.0.7 局
+    // 18.41.20:341 就是唯一一次 dead=1 的窗口），必须在这里抢在 Super::UnEquip 清引用之前锁存。
+    UpdateDeathLatch();
+    // ★1.0.7 死亡风暴插桩（与 Equip 同款，见彼处注释）。★1.0.8 增加 latch。
+    WT_WARNF(TEXT("[equip] UnEquip: dead=%d needRespawn=%d latch=%d"),
+             IsInstigatorDead(), IsControllerAwaitingRespawn(), bDeathSeen ? 1 : 0);
     ClosePanel();
     // ★v0.2.12 摘除右键输入（IMC 移除 + 解绑）。
     RemoveToggleInput();
@@ -2311,6 +2497,13 @@ void ARemote_FactoryEquipment::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void ARemote_FactoryEquipment::OpenPanel()
 {
     WT_ZONE_COARSE(TEXT("Equip.OpenPanel"));
+    // ★1.0.4 死亡守卫（防御纵深）：HandleToggleInput 已拦，但 OpenPanel 还有别的调用方
+    //   （装备抽出自动开面板等）。死亡态一律拒开，保证 Death UI 永远不被面板盖住。
+    if (IsInstigatorDead())
+    {
+        WT_WARNF(TEXT("[equip] OpenPanel refused: instigator is dead (death UI must stay on top)."));
+        return;
+    }
     // ★v0.2.12 ESC 关闭路径（FGGameUI PopWidget → RemoveFromParent）不会通知我们清指针：
     // 检测"指针还在但已不在视口"先重置，否则这次 OpenPanel 会被旧指针挡成 no-op。
     // ★0.2.74 兜底还原：走到这里说明面板是被外部摘掉的（机器 UI 交接/游戏栈清理），
@@ -2481,6 +2674,15 @@ void ARemote_FactoryEquipment::StartPanelWatchdog()
                 return false;
             }
 
+            // ①.5 ★1.0.4 死亡收面板：面板开着时玩家死了（坠崖/辐射等），死亡瞬间收掉面板，
+            //   还原 GameOnly+隐光标，保证 Death UI（含右键/点击复活）不被面板挡住。
+            if (Self->IsInstigatorDead())
+            {
+                WT_WARNF(TEXT("[equip] watchdog: instigator died with the panel up; closing it so the death UI stays reachable."));
+                Self->ClosePanel();
+                return false;
+            }
+
             // ② GameUI 就绪即补注册（ESC 替补关）。★v0.2.20 注册已停用（见 TryRegisterWithGameUI 内注释）。
             if (!Self->bRegisteredWithGameUI)
             {
@@ -2511,6 +2713,10 @@ void ARemote_FactoryEquipment::ClosePanel()
     // 否则会把暂停菜单的光标也干掉。
     AFGPlayerController* ClosePC = Cast<AFGPlayerController>(PanelWidget->GetOwningPlayer());
     const bool bPauseOpen = ClosePC && ClosePC->GetGameUI() && ClosePC->GetGameUI()->IsPauseMenuOpen();
+    // ★1.0.5 死亡同理：死亡时原版死亡 UI（Respawn 界面）自己接管输入模式与鼠标光标；
+    // 看门狗"死亡自动收面板"若在这里还原 GameOnly + 藏鼠标，会把死亡 UI 的输入状态覆盖掉
+    // ⇒ 复活交互（右键/点击 Respawn）全部失效（1.0.4 实测实锤：面板不开了但右键仍无法复活）。
+    const bool bInstigatorDead = IsInstigatorDead();
 
     if (PanelWidget->IsInViewport())
     {
@@ -2528,6 +2734,19 @@ void ARemote_FactoryEquipment::ClosePanel()
         // RemoveFromParent is the UMG-side teardown; clearing the pointer lets the widget be
         // collected and makes the next OpenPanel() a fresh open rather than a no-op.
         PanelWidget->RemoveFromParent();
+
+        // ★1.0.7 还原输入模式【移入 IsInViewport 块内】：旧版放在块外，"PanelWidget 非空但
+        // 已不在视口"的边界态（EndPlay/风暴期 UnEquip 收面板）也会执行 SetInputMode(GameOnly)+
+        // 藏鼠标——死亡 UI 开着时这就是一把暗枪（1.0.4 会话 16:55 风暴每次 UnEquip 都调
+        // ClosePanel）。现在只有真收掉一块在视口的面板才还原，且保留暂停/死亡两道例外。
+        // 依据：v0.2.52 语义不变，只收窄触发面。
+        if (ClosePC && !bPauseOpen && !bInstigatorDead)
+        {
+            FInputModeGameOnly InputMode;
+            ClosePC->SetInputMode(InputMode);
+            ClosePC->bShowMouseCursor = false;
+            WT_WARNF(TEXT("[equip] panel closed; input restored to GameOnly (mouse + keyboard back to game)."));
+        }
     }
     PanelWidget = nullptr;
     bRegisteredWithGameUI = false;
@@ -2536,18 +2755,6 @@ void ARemote_FactoryEquipment::ClosePanel()
     {
         FTSTicker::GetCoreTicker().RemoveTicker(PanelWatchdogHandle);
         PanelWatchdogHandle.Reset();
-    }
-
-    // ★v0.2.52 还原输入模式（修复「关闭面板后卡鼠标+键盘」）：暂停菜单没开时才还原
-    // （避免覆盖暂停菜单光标）。还原用 FInputModeGameOnly（游戏默认模式）：鼠标自由转视角 +
-    // 键盘全归游戏。此前误还原成 FInputModeGameAndUI（无焦点控件），会把鼠标锁在 UI 模式
-    // （无法转视角=卡鼠标）、键盘路由到无焦点 Slate（=卡键盘）。
-    if (ClosePC && !bPauseOpen)
-    {
-        FInputModeGameOnly InputMode;
-        ClosePC->SetInputMode(InputMode);
-        ClosePC->bShowMouseCursor = false;
-        WT_WARNF(TEXT("[equip] panel closed; input restored to GameOnly (mouse + keyboard back to game)."));
     }
 
     WT_LOGF(TEXT("[equip] panel closed."));
@@ -2569,6 +2776,30 @@ void ARemote_FactoryEquipment::ApplyToggleInput(AFGCharacterPlayer* Character)
     APlayerController* PC = Character ? Cast<APlayerController>(Character->GetController()) : nullptr;
     if (!PC || !PC->GetLocalPlayer())
     {
+        return;
+    }
+
+    // ★1.0.7 死亡期绝不挂右键 IMC：原版死亡界面=右键复活（社区+原版键位实锤），而死亡卸装/
+    // 复活链会反复触发本函数（1.0.6 局 18:12.12-15 风暴每轮 Equip 都重挂 priority=10000 的
+    // 右键 IMC）。死亡态一律跳过挂载；若之前已挂则先摘，把右键完全还给死亡 UI。
+    // 复活后的正常 Equip（活着）走下方原路径，右键照常恢复。
+    if (IsInstigatorDead())
+    {
+        if (GWT_ToggleIMC)
+        {
+            if (const APlayerController* DeadPC = Character ? Cast<APlayerController>(Character->GetController()) : nullptr)
+            {
+                if (DeadPC->GetLocalPlayer())
+                {
+                    if (UEnhancedInputLocalPlayerSubsystem* Sub =
+                            DeadPC->GetLocalPlayer()->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+                    {
+                        Sub->RemoveMappingContext(static_cast<UInputMappingContext*>(GWT_ToggleIMC));
+                    }
+                }
+            }
+        }
+        WT_WARNF(TEXT("[equip] dead at ApplyToggleInput: right-click IMC withheld (respawn UI owns right-click)."));
         return;
     }
 
@@ -2679,9 +2910,91 @@ void ARemote_FactoryEquipment::RemoveToggleInput()
     }
 }
 
+bool ARemote_FactoryEquipment::IsInstigatorDead() const
+{
+    // ★1.0.8 第一优先：粘性标记。死亡瞬间原版会清 Instigator（1.0.7 局 18.41.20 实锤同帧
+    // dead=1 → dead=0），此后查询式检测必然失灵；标记一旦置位即持续生效到拿到活体实证。
+    if (bDeathSeen)
+    {
+        return true;
+    }
+    return IsConfirmedDeadNow();
+}
+
+bool ARemote_FactoryEquipment::IsConfirmedDeadNow() const
+{
+    // 一手锚点：FGCharacterBase.h:210 FORCEINLINE GetHealthComponent()；
+    // FGHealthComponent.h:137 FORCEINLINE IsDead() { return mIsDead; }；
+    // FGPlayerController.h:162 NeedRespawn()（注释"e.g. the pawn is dead"）。
+    // ★仅凭本帧实证判定，不含粘性 —— 用于「代为触发原版复活」这类有副作用的操作。
+    if (IsControllerAwaitingRespawn())
+    {
+        return true;
+    }
+    const AFGCharacterPlayer* Character = GetInstigatorCharacter();
+    const UFGHealthComponent* Health = Character ? Character->GetHealthComponent() : nullptr;
+    return Health ? Health->IsDead() : false;
+}
+
+void ARemote_FactoryEquipment::UpdateDeathLatch()
+{
+    if (IsConfirmedDeadNow())
+    {
+        if (!bDeathSeen)
+        {
+            bDeathSeen = true;
+            HandleDeathDetected();
+        }
+        return;
+    }
+    // 清除需要「活着的实证」：Instigator 在 + 血量组件在 + 明确没死 + 控制器不等复活。
+    // 缺任一条件（死亡中/换 pawn/读档边界）都保持标记，宁可保守扣着右键 IMC。
+    const AFGCharacterPlayer* Character = GetInstigatorCharacter();
+    const UFGHealthComponent* Health = Character ? Character->GetHealthComponent() : nullptr;
+    if (Health && !Health->IsDead() && !IsControllerAwaitingRespawn())
+    {
+        if (bDeathSeen)
+        {
+            bDeathSeen = false;
+            WT_WARNF(TEXT("[equip] death latch cleared: instigator alive again (right-click IMC may re-arm)."));
+        }
+    }
+}
+
+void ARemote_FactoryEquipment::HandleDeathDetected()
+{
+    // ★死亡收尾（幂等）：把右键完整还给原版死亡界面。
+    //  ① 面板开着则收掉（面板会抢输入模式，盖住/顶掉死亡 UI）；
+    //  ② 摘右键 IMC（priority=10000 会吞掉右键，原版死亡界面收不到点击 → 无法复活）；
+    //  ③ Pop 自有 EIC（RemoveToggleInput 内部同时做 ②③，且已按 0.2.125 幂等化）。
+    if (PanelWidget && PanelWidget->IsInViewport())
+    {
+        WT_WARNF(TEXT("[equip] death detected: closing panel so the death UI stays reachable."));
+        ClosePanel();
+    }
+    RemoveToggleInput();
+    WT_WARNF(TEXT("[equip] death detected: right-click IMC + own EIC removed (respawn UI owns right-click)."));
+}
+
+bool ARemote_FactoryEquipment::IsControllerAwaitingRespawn() const
+{
+    // ★1.0.7 一手锚点：FGPlayerController.h:162 UFUNCTION(BlueprintPure) bool NeedRespawn() const。
+    // 注释原文："true if this player controller needs to respawn it's pawn, e.g. the pawn is dead."
+    const AFGCharacterPlayer* Character = GetInstigatorCharacter();
+    const AFGPlayerController* FGP = Character ? Cast<AFGPlayerController>(Character->GetController()) : nullptr;
+    return FGP ? FGP->NeedRespawn() : false;
+}
+
 void ARemote_FactoryEquipment::HandleToggleInput(const FInputActionValue& Value)
 {
     WT_ZONE_COARSE(TEXT("Equip.HandleToggleInput"));
+    UpdateDeathLatch();
+    // ★1.0.7 右键插桩（关键取证）：死亡期我们的 IMC 已被 ApplyToggleInput 死亡分支扣下，
+    // 本行若在死亡态出现=右键仍能到达我们（说明还有别的通道在喂）；若从不出现=右键全部
+    // 归还给了原版，无法复活的锅在我们代码之外（别的 mod 或原版 UI 叠层）。
+    WT_WARNF(TEXT("[toggle] right-click: dead=%d needRespawn=%d latch=%d panelUp=%d"),
+             IsInstigatorDead(), IsControllerAwaitingRespawn(), bDeathSeen ? 1 : 0,
+             (PanelWidget && PanelWidget->IsInViewport()) ? 1 : 0);
     // ★v0.2.15 防暂停卡死：暂停菜单开着时忽略右键（否则会把面板 toggle 到暂停菜单底下卡死）。
     if (const AFGCharacterPlayer* Character = GetInstigatorCharacter())
     {
@@ -2695,6 +3008,36 @@ void ARemote_FactoryEquipment::HandleToggleInput(const FInputActionValue& Value)
                 }
             }
         }
+    }
+
+    // ★1.0.4 死亡守卫（SMM 首测用户实锤）：死亡后右键仍会开面板 —— GameAndUI + 抢焦点，
+    // 把 Death UI 盖住/顶掉，玩家"无法右键复活"。死亡态：面板开着则收掉（还原输入），
+    // 不再新开；右键本身放行（不拦截原始输入，原版复活交互照常收到）。
+    if (IsInstigatorDead())
+    {
+        if (PanelWidget && PanelWidget->IsInViewport())
+        {
+            WT_WARNF(TEXT("[equip] toggle while dead: closing the panel so the death UI stays reachable."));
+            ClosePanel();
+        }
+        // ★1.0.8 代为复活兜底：我们的 IMC（priority=10000）会吞掉右键，原版死亡界面因此收不到
+        // 点击。既然右键落到了我们手里，就替原版把复活走完 —— 一手锚点 FGPlayerController.h:152
+        // UFUNCTION(BlueprintCallable) void StartRespawn()（注释："call Respawn when done playing
+        // any respawn effects"，即正门；Server_Respawn 是 Server RPC，不可直接调）。
+        // ★只认「本帧实证死亡」（IsConfirmedDeadNow），绝不用粘性 bDeathSeen —— 后者可能在
+        // 换 pawn/读档边界残留，拿它触发复活有活体误触发风险。
+        if (IsConfirmedDeadNow())
+        {
+            if (AFGCharacterPlayer* Character = GetInstigatorCharacter())
+            {
+                if (AFGPlayerController* FGP = Cast<AFGPlayerController>(Character->GetController()))
+                {
+                    FGP->StartRespawn();
+                    WT_WARNF(TEXT("[toggle] dead + right-click: forwarded to vanilla StartRespawn()."));
+                }
+            }
+        }
+        return;
     }
 
     // ★v0.2.13 用户定案：右键 = 开/关切换；★v0.2.14 ESC 为替补关面板键（GameUI 栈注册成功后生效）。

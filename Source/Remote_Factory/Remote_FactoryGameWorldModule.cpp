@@ -299,8 +299,9 @@ URemote_FactoryGameWorldModule::URemote_FactoryGameWorldModule()
     // 是为了修"两条路都断"；现在 MAM 能用了，就按最初的设计收回去：
     //   HUB 里程碑  -> 只负责无线终端本身（T1，且按 v0.2.3 定案只给手持便携版）
     //   MAM 研究树  -> 三个插件建筑的解锁 + 逐级强化
-    // 两个里程碑类保留（存档/兼容），只是不再注册，因此 HUB 里不会再出现它们的卡片。
-    // mSchematics.Add(UWTUpgradeStorageMilestone::StaticClass());
+    // 两个里程碑类保留（存档/兼容）。★1.0.11 例外：超级蓄电池（储能单元）恢复由 T3 HUB 里程碑发放，
+    // 故重新注册该里程碑（加速器仍保留注释、不注册）。MAM 研究轨仍不恢复（用户定案）。
+    mSchematics.Add(UWTUpgradeStorageMilestone::StaticClass());
     // mSchematics.Add(UWTUpgradeAcceleratorMilestone::StaticClass());
 
     for (TSubclassOf<UFGSchematic> C : WT_GetAllUpgradeResearch())
