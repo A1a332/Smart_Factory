@@ -1644,13 +1644,15 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
         FVector EleAnchor = Target->GetActorLocation();
         const float EleStandoff = 2150.f;
 
-        // ★0.2.153x3 用户 2026-10-23：在 22m 外推基础上整体往左挪 2m（200cm）。
-        // 左向 = 落点方向 EleDir 绕塔左转 90°（与 x2 左转语义一致），水平投影后归一化。
+        // ★0.2.153x7 用户 2026-10-23 截图定案：落点要在当前点（中线左偏2m）基础上往右 4~6m，
+        // 取中值 5m ⇒ 净偏移 = 左2m − 右5m = 中线右偏 3m（沿 EleLeft 反方向 300cm）。
+        // EleLeft = 落点方向 EleDir 绕塔左转 90°（= 落地面向塔时玩家左侧，x3 轮用户实测确认过），
+        // 「右」即 -EleLeft；水平投影后归一化。
         {
             FVector EleLeft = EleDir.RotateAngleAxis(90.f, FVector::UpVector);
             EleLeft.Z = 0.f;
             EleLeft.Normalize();
-            EleAnchor += EleLeft * 200.f;
+            EleAnchor -= EleLeft * 300.f;
         }
 
         const FString EleKey = FString::Printf(TEXT("Ele|%s"), *Target->GetPathName());
