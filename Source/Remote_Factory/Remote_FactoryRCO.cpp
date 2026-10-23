@@ -1207,7 +1207,7 @@ static void WT_ScheduleTeleportGroundFix(UWorld* World, AFGCharacterPlayer* Char
 // 但镜头朝向仍沿用传送前的旧朝向 ⇒ 人站在终端旁边却对着墙/荒野，体感就是「没传送到终端面前」。
 // 落地后把控制器与角色 yaw 对准目标（只转水平朝向，不改 pitch/roll，避免仰天/低头）。
 // SetControlRotation 为 AController 的 public 虚函数（Controller.h:163），蓝图可调、服务端调安全。
-static void WT_FaceTarget(AFGCharacterPlayer* Character, const FVector& TargetLoc)
+static void WT_FaceTarget(AFGCharacterPlayer* Character, const FVector& TargetLoc, float ExtraYawDeg = 0.f)
 {
     if (!Character)
     {
@@ -1224,7 +1224,13 @@ static void WT_FaceTarget(AFGCharacterPlayer* Character, const FVector& TargetLo
     {
         return;
     }
-    const FRotator Look = Dir.Rotation();      // 水平朝向（Z 已清零 ⇒ pitch=0）
+    FRotator Look = Dir.Rotation();             // 水平朝向（Z 已清零 ⇒ pitch=0）
+    if (ExtraYawDeg != 0.f)
+    {
+        // ★0.2.153x：在「面向目标」基础上叠加额外偏航（用户实测落点后需补转才能正对面板/入口）。
+        // UE Yaw 正方向为逆时针（左转），故「左转 N°」= +N、「右转 N°」= -N。
+        Look.Yaw = FMath::UnwindDegrees(Look.Yaw + ExtraYawDeg);
+    }
     Ctrl->SetControlRotation(Look);
     Character->SetActorRotation(FRotator(0.f, Look.Yaw, 0.f));
 }
@@ -1629,7 +1635,8 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
                                                        /*AnchorOverride=*/&EleAnchor);
         if (Spot.bFound)
         {
-            WT_FaceTarget(Character, Target->GetActorLocation()); // 落地转身面向电梯
+            // ★0.2.153x 落地转身：面向塔心后再左转 120°（用户实测落点在右侧货物传送入口，需左转 120° 正对入口）。
+            WT_FaceTarget(Character, Target->GetActorLocation(), 120.f);
             if (Spot.bFromCache)
             {
                 WT_ScheduleTeleportGroundFix(World, Character, EleKey, Target);
@@ -1772,7 +1779,9 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
                                                        HubKey, TEXT("teleport-hub"));
         if (Spot.bFound)
         {
-            WT_FaceTarget(Character, TLoc);   // ★0.2.153o 落地转身面向终端
+            // ★0.2.153x 落地转身：终端左转 90° / 制作台(等集成建筑)右转 90°（用户实测，相对「面向目标」）。
+            const float HubFaceYaw = (Cast<AFGBuildableHubTerminal>(Target) != nullptr) ? 90.f : -90.f;
+            WT_FaceTarget(Character, TLoc, HubFaceYaw);
             if (Spot.bFromCache)
             {
                 // 查表直传：目的地区块可能刚开始流送，0.6s 后补一次地面校正
