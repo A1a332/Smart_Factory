@@ -1643,7 +1643,8 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
         const FVector EleOutward = (EleEntrance ? EleEntrance->GetForwardVector() : Target->GetActorForwardVector()).GetSafeNormal();
         const FVector EleRight = FVector::CrossProduct(EleOutward, FVector::UpVector).GetSafeNormal(); // 水平右向
         // —— 落点参数（旋转无关；调参只改这几行）——
-        const float EleYawOff   = 120.f;   // 落点方向相对入口前向的偏航（度，绕世界Up）：+120=绕塔左转120°（复刻 x2 老行为），-120=右转
+        const float EleYawOff   = 30.f;    // 落点方向相对「入口前向」的偏航（度，绕世界Up）。入口前向=actor forward+90（Input5 relRot y=90），
+                                           // +30 ⇒ 相对 actor forward 恰为 +120 = 复刻 x2「绕塔左转120°」老落点（x13 填120多转了90°，实测落偏）
         const float EleStandout = 2150.f;  // 沿（绕塔偏航后的）落点方向外推 21.5m（入口平台落点定标，18~23m）
         const float EleRightOff = 0.f;     // 沿真实右向手偏（右偏填正值；旋转安全，取自组件世界朝向）
         // 旋转落点方向（绕世界Up）：用 Outward/Right 线性组合，避坑 CSS 引擎 RotateAngleAxis 异常；
