@@ -1261,6 +1261,7 @@ static FWT_LandSpot WT_SearchLandingSpot(UWorld* World, AFGCharacterPlayer* Char
                                          const FCollisionQueryParams& LandOverlapQ,
                                          const FString& SpotKey, const TCHAR* LogTag,
                                          float StandoffOverride = 0.f,
+                                         float MaxStandoff = 0.f,
                                          const FVector* AnchorOverride = nullptr)
 {
     FWT_LandSpot Out;
@@ -1389,6 +1390,12 @@ static FWT_LandSpot WT_SearchLandingSpot(UWorld* World, AFGCharacterPlayer* Char
         }
         const int32 Di = Plan[Ci].DirIdx;
         const float Standoff = StandoffBase + 100.f * Plan[Ci].Ring;
+        // ★0.2.153z 枢纽 3m 内定标：超出 MaxStandoff 的候选直接跳过（不往外推到远场），
+        // 让落点约束在目标前方 ≤3m（MaxStandoff=0 表示不限制，普通建筑/机器不受影响）。
+        if (MaxStandoff > 0.f && Standoff > MaxStandoff)
+        {
+            continue;
+        }
         // ★0.2.153x5：候选点 Z 抬到 GroundRefZ（锚点正下方自然地面 / 平台顶面），
         // 否则电梯这类「actor 原点埋在平台下方」的目标，探地射线起点低于平台顶面，
         // 永远穿透平台打到下方地形（floor='Landscape'）——落点永不上平台。
@@ -1834,6 +1841,15 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
         FCollisionQueryParams LandOverlapQ(SCENE_QUERY_STAT(WT_HubLandOverlap), /*bTraceComplex=*/false);
         LandOverlapQ.AddIgnoredActor(Target);
         LandOverlapQ.AddIgnoredActor(Character);
+        // ★0.2.153z 枢纽 3m 内定标：推翻 0.2.153i「LandOverlapQ 必须把枢纽算进去」的旧结论——
+        // 旧日志实锤 Hub(MainMesh) 自身碰撞体覆盖终端前方一大片，3m 内落点被它误判「卡结构」全 reject，
+        // 落点一路被推到 7m+。Hub 是开放建筑（玩家本就能走进站/站平台，其地面可站立），
+        // 故落点合法性检测忽略 Hub 本体（与 GroundTrace 一致）；保留对终端外的独立设备(制作台等)
+        // 的卡墙检测，避免真嵌进别的实体。
+        if (Hub)
+        {
+            LandOverlapQ.AddIgnoredActor(Hub);
+        }
 
 
         // ★0.2.153c 落点方向定稿（大肥鱼第三轮修正，取代前两版）：
@@ -1898,12 +1914,14 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
             LandBase.Normalize();
         }
         // 落点搜索统一走 WT_SearchLandingSpot（与普通建筑完全同一套）。
-        // 本分支只保留枢纽专属准备：忽略集（终端 + 枢纽本体及其挂件）、
+        // 本分支只保留枢纽专属准备：忽略集（终端 + 玩家 + 枢纽本体（0.2.153z 为 3m 内定标忽略））、
         // 方向基准（终端朝向翻转 180° 正对面板 / hub-center 朝外）、落点表键 Hub|<对象路径名>。
+        // ★0.2.153z 3m 内定标：固定起跳距 300cm（恢复近场≤3m 优先），最大外推封顶 300cm（不跑远）。
         const FString HubKey = WT_HubSpotKey(Target);
         const FWT_LandSpot Spot = WT_SearchLandingSpot(World, Character, Target, LandBase, DirSrc,
                                                        GroundTrace, LandOverlapQ,
-                                                       HubKey, TEXT("teleport-hub"));
+                                                       HubKey, TEXT("teleport-hub"),
+                                                       300.f, 300.f);
         if (Spot.bFound)
         {
             // 落地后不额外转视角（删除早期视角转向）：落点坐标已偏移到目标侧，保持传送前朝向。
