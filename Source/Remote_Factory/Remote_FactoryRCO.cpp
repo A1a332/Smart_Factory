@@ -1644,15 +1644,17 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
         FVector EleAnchor = Target->GetActorLocation();
         const float EleStandoff = 2150.f;
 
-        // ★0.2.153x7 用户 2026-10-23 截图定案：落点要在当前点（中线左偏2m）基础上往右 4~6m，
-        // 取中值 5m ⇒ 净偏移 = 左2m − 右5m = 中线右偏 3m（沿 EleLeft 反方向 300cm）。
-        // EleLeft = 落点方向 EleDir 绕塔左转 90°（= 落地面向塔时玩家左侧，x3 轮用户实测确认过），
-        // 「右」即 -EleLeft；水平投影后归一化。
+        // ★0.2.153x8 修复 x7 横向偏移失效：x7 用 `EleDir.RotateAngleAxis(90,Up)` 求垂直向量，
+        // 但该引擎/CSS 构建下实测此调用返回的就是 EleDir 本身（径向），导致「右移」被算成沿 EleDir
+        // 朝塔心推（日志 anchor 增量精确 = -EleDir*500）。改用手算垂直向量，数学上必然垂直：
+        //   玩家落地面向塔(=-EleDir) 时的右手边 = Up × (-EleDir) = (-EleDir.Y, EleDir.X)。
+        // 用户截图定案：在落点正前方基础上整体往右 4~6m（取中值 5m）；纯横向，不带径向偏移，
+        // 落点距塔心 ≈ √(2150²+500²)≈22m，仍在用户标定的 18~23m 平台落点范围内。
         {
-            FVector EleLeft = EleDir.RotateAngleAxis(90.f, FVector::UpVector);
-            EleLeft.Z = 0.f;
-            EleLeft.Normalize();
-            EleAnchor -= EleLeft * 300.f;
+            FVector EleRight = FVector(EleDir.Y, -EleDir.X, 0.f); // = 玩家右手边（面向塔）
+            EleRight.Z = 0.f;
+            EleRight.Normalize();
+            EleAnchor += EleRight * 500.f;
         }
 
         const FString EleKey = FString::Printf(TEXT("Ele|%s"), *Target->GetPathName());
