@@ -1612,6 +1612,10 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
             EleSrc = TEXT("spaceelev-to-player");
         }
         EleDir.Normalize();
+        // ★0.2.153x2 用户实测：落点坐标需绕塔左转 120°（非仅落地后转视角），使落点落到
+        // 右侧货物传送入口正前方。UE Yaw 正方向=逆时针(左转)=+。
+        EleDir = EleDir.RotateAngleAxis(120.f, FVector::UpVector);
+        EleDir.Normalize();
 
         // ★0.2.153x 用户 2026-10-23 定案：落点 = 塔基座中心（actor pivot）往外推 10m。
         // 一手实锤（SpaceElevatorDumpTool commandlet dump Build_SpaceElevator SCS 25 节点）：
@@ -1635,8 +1639,8 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
                                                        /*AnchorOverride=*/&EleAnchor);
         if (Spot.bFound)
         {
-            // ★0.2.153x 落地转身：面向塔心后再左转 120°（用户实测落点在右侧货物传送入口，需左转 120° 正对入口）。
-            WT_FaceTarget(Character, Target->GetActorLocation(), 120.f);
+            // ★0.2.153x2 落点坐标已绕塔偏移到入口正前方，落地后面向塔即可（不再额外偏航）。
+            WT_FaceTarget(Character, Target->GetActorLocation());
             if (Spot.bFromCache)
             {
                 WT_ScheduleTeleportGroundFix(World, Character, EleKey, Target);
@@ -1720,8 +1724,9 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
         // ★0.2.153c 落点方向定稿（大肥鱼第三轮修正，取代前两版）：
         // ① 方向原点用枢纽 bbox 的 GetCenter 压平算「中心→终端」水平方向——枢纽 actor 的 pivot
         //    不在几何中心（底座/顶端偏斜），拿 pivot 当原点方向会算歪；落点高度不靠算，由 trace/navmesh 定；
-        // ② 主距不再拍脑袋 250：终端是嵌入式（本来就贴结构表面），起跳距 = hub bbox 沿该方向
-        //    的水平半宽 + 100；
+        // ② 起跳距不再拍脑袋 250：★0.2.153q 重构后由 WT_SearchLandingSpot 用 Target(终端/制作台
+        //    本尊) 自身 bbox 沿主方向水平半宽 + 胶囊半径 + 10 推导（≈1.7m），近场(≤3m)优先生效；
+        //    此处不再单独算 hub bbox 半宽（旧 0.2.153c 逻辑已弃用，留注释只为溯源）。
         // ③ 挖到落点后再验一眼在不在 bbox 框内（嵌入式结构有挑檐/凸檐，框内=落檐下），
         //    框内沿该方向径向外推 100，最多推两次，还在框内就放弃该方向，不硬塞；
         // ④ 兜底扇 0/±30 三条（第五轮：±60 两条也剔掉）；
@@ -1770,6 +1775,13 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
             DirSrc = TEXT("to-player");
         }
         LandBase.Normalize();
+        // ★0.2.153x2 用户实测：落点坐标需绕目标偏移到正对面板方位（非仅落地后转视角）。
+        // 终端左转 90°(+)、制作台(等集成建筑)右转 90°(-)；与 0.2.153x 落地后视角符号一致。
+        {
+            const float HubLandYaw = (Cast<AFGBuildableHubTerminal>(Target) != nullptr) ? 90.f : -90.f;
+            LandBase = LandBase.RotateAngleAxis(HubLandYaw, FVector::UpVector);
+            LandBase.Normalize();
+        }
         // ★0.2.153q 落点搜索统一走 WT_SearchLandingSpot（与普通建筑完全同一套，见函数注释）。
         // 本分支只保留枢纽专属准备：忽略集（终端 + 枢纽本体及其挂件）、方向基准（终端朝向
         // 翻转 180° 再右转 90°，0.2.153o/o2 用户实测定案）、以及落点表键 Hub|<对象路径名>。
@@ -1779,9 +1791,8 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
                                                        HubKey, TEXT("teleport-hub"));
         if (Spot.bFound)
         {
-            // ★0.2.153x 落地转身：终端左转 90° / 制作台(等集成建筑)右转 90°（用户实测，相对「面向目标」）。
-            const float HubFaceYaw = (Cast<AFGBuildableHubTerminal>(Target) != nullptr) ? 90.f : -90.f;
-            WT_FaceTarget(Character, TLoc, HubFaceYaw);
+            // ★0.2.153x2 落点坐标已偏移到正对面板，落地后面向目标即可（不再额外偏航）。
+            WT_FaceTarget(Character, TLoc);
             if (Spot.bFromCache)
             {
                 // 查表直传：目的地区块可能刚开始流送，0.6s 后补一次地面校正
