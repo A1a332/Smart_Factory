@@ -1703,12 +1703,32 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
                 continue;
             }
             const FVector TryDest = FVector(WorldLand.X, WorldLand.Y, LZ + EleCapH + 20.f);
+            // x17：检测胶囊半径收窄到 65%（用户要落「控制台前小平台」≈7~9m；7.5/9.5m 两档被全尺寸
+            // 胶囊挡出）。真实落位仍先走引擎 TeleportTo（全尺寸胶囊防嵌）+ SetActorLocation 回退，不会硬嵌。
+            const FCollisionShape EleTestShape = FCollisionShape::MakeCapsule(
+                FMath::Max(EleCapR * 0.65f, 28.f), FMath::Max(EleCapH - 2.f, 10.f));
             if (World->OverlapBlockingTestByChannel(TryDest, FQuat::Identity, ECC_Pawn,
-                    FCollisionShape::MakeCapsule(EleCapR, FMath::Max(EleCapH - 2.f, 10.f)),
-                    EleOverlap))
+                    EleTestShape, EleOverlap))
             {
-                WT_WARNF(TEXT("[teleport-spaceelev] overlap at world=%s push=%d - push out"),
-                         *WorldLand.ToString(), Push);
+                // 诊断：列出阻挡者名字（OverlapMultiByChannel 实锤 World.h:2268；FOverlapResult::GetActor/
+                // GetComponent 实锤 OverlapResult.h:29/32；仅在被挡时多查一次，不动判定语义）
+                FString EleBlkNames;
+                {
+                    TArray<FOverlapResult> EleBlk;
+                    if (World->OverlapMultiByChannel(EleBlk, TryDest, FQuat::Identity, ECC_Pawn,
+                            EleTestShape, EleOverlap))
+                    {
+                        for (const FOverlapResult& OV : EleBlk)
+                        {
+                            if (AActor* BA = OV.GetActor())
+                                EleBlkNames += BA->GetName() + TEXT(" ");
+                            else if (UPrimitiveComponent* BC = OV.GetComponent())
+                                EleBlkNames += BC->GetName() + TEXT(" ");
+                        }
+                    }
+                }
+                WT_WARNF(TEXT("[teleport-spaceelev] overlap at world=%s push=%d testR=%.0f by=[%s]- push out"),
+                         *WorldLand.ToString(), Push, EleTestShape.Capsule.Radius, *EleBlkNames);
                 UsedPush = Push;
                 continue;
             }
