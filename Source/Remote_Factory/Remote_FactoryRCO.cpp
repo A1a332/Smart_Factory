@@ -1614,74 +1614,107 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
             }
         }
 
-        FVector EleDir = Target->GetActorForwardVector();
-        EleDir.Z = 0.f;
-        const TCHAR* EleSrc = TEXT("spaceelev-fwd");
-        if (EleDir.SizeSquared() < KINDA_SMALL_NUMBER)
-        {
-            EleDir = ToPlayer; // forward 全竖直（理论上不存在）时的无害兜底
-            EleSrc = TEXT("spaceelev-to-player");
-        }
-        EleDir.Normalize();
-        // ★0.2.153x2 用户实测：落点坐标需绕塔左转 120°（非仅落地后转视角），使落点落到
-        // 右侧货物传送入口正前方。UE Yaw 正方向=逆时针(左转)=+。
-        EleDir = EleDir.RotateAngleAxis(120.f, FVector::UpVector);
-        EleDir.Normalize();
+        // ============================================================
+        // ★0.2.153x9 重写：落点**完全写在建筑本地坐标系**，再用
+        // GetActorTransform().TransformPosition() 变换到世界。
+        // 此前 x2~x8 全用世界系偏移（forward.RotateAngleAxis(120) / += EleRight*500 /
+        // anchor + EleDir*2150）——这些在玩家旋转/平移建筑后会整组炸坐标。
+        // 本地系写法：建筑怎么转，落点就怎么跟，绝不炸。
+        // 一手几何（se_dump_trace.txt，Build_SpaceElevator SCS）：
+        //   货物传送入口 Input4~6 在本地 relLoc X=1500 Y=+2000 Z=100，接口 yaw=90 朝外(+Y)
+        //   ⇒ 本地 +Y = 入口朝外方向（即此前「forward 绕 120°」的本地等价写法，
+        //     但不再依赖世界系魔法角）。落点 = 入口中线沿本地 +Y 外推。
+        // 注：太空电梯无独立交互/操作台场景组件（dump 实锤，交互在 native 基类、靠准星
+        //   trace 塔身），故落点锚在入口本地坐标，而非不存在的「操作台组件」。
+        // ============================================================
+        const FTransform EleT = Target->GetActorTransform();
 
-        // ★0.2.153x 用户 2026-10-23 定案：落点 = 塔基座中心（actor pivot）往外推 10m。
-        // 一手实锤（SpaceElevatorDumpTool commandlet dump Build_SpaceElevator SCS 25 节点）：
-        //   MainMesh/RootComponent relLoc=(0,0,0) ⇒ actor pivot = 塔基座底部几何中心；
-        //   Input1~6 relLoc Y=±2000 Z=100（前后缘传送带进口）；
-        //   BP_LadderComponent×4 relLoc X≈2100~2235 Y=±1280（两侧梯子）
-        //   ⇒ 基座平台可站半径约 20m，无独立「交互面板」组件（交互在 native 基类）。
-        // 0.2.153w 的「bbox 顶 - 150」锚点实测失败：塔 bbox 顶伸到 Z≈560 万（天上），
-        // 16 候选全 no-floor、缓存兜底落回 v 版旧点 ⇒ 废弃 bbox 锚定，锚点回到 pivot。
-        // 0.2.153 早期 250cm 死数字实测「正中心动不了」：塔身底座占中心 ⇒ 起跳距
-        // 固定 2150cm（21.5m）：用户 2026-10-23 实测——18~23m 区间内真正落在基座平台上的点
-        // 约在 21.5m；0.2.153x5 已把候选点 Z 抬到 GroundRefZ 让平台顶面可被探地射线命中，本值即平台落点。
-        // 方向 = 自身 forward（authored 正面）绕塔左转 120°（0.2.153x2），
-        // 走枢纽终端同款 8 向扇搜 + overlap 防嵌塔/嵌平台，失败沿 Ring 继续外推。
-        FVector EleAnchor = Target->GetActorLocation();
-        const float EleStandoff = 2150.f;
+        // —— 落点本地系参数（全部本地坐标，旋转无关；调参只改这两行）——
+        const float EleStandout = 150.f;   // 入口(Y=2000)再外推 150 ⇒ 落点本地 Y=2150（用户实测 18~23m 平台落点）
+        const float EleRightOff = 0.f;     // 本地 X 右偏：玩家落地面向塔(本地 -Y) 右手边=本地 -X，
+                                          // 要右偏填负值（如 -500）；先置 0 居中，调参只改这里。
+        const UCapsuleComponent* EleCap = Character->GetCapsuleComponent();
+        const float EleCapH = EleCap ? EleCap->GetScaledCapsuleHalfHeight() : 90.f;
+        const float EleCapR = EleCap ? EleCap->GetScaledCapsuleRadius() : 60.f;
 
-        // ★0.2.153x8 修复 x7 横向偏移失效：x7 用 `EleDir.RotateAngleAxis(90,Up)` 求垂直向量，
-        // 但该引擎/CSS 构建下实测此调用返回的就是 EleDir 本身（径向），导致「右移」被算成沿 EleDir
-        // 朝塔心推（日志 anchor 增量精确 = -EleDir*500）。改用手算垂直向量，数学上必然垂直：
-        //   玩家落地面向塔(=-EleDir) 时的右手边 = Up × (-EleDir) = (-EleDir.Y, EleDir.X)。
-        // 用户截图定案：在落点正前方基础上整体往右 4~6m（取中值 5m）；纯横向，不带径向偏移，
-        // 落点距塔心 ≈ √(2150²+500²)≈22m，仍在用户标定的 18~23m 平台落点范围内。
+        // 落点 XY 下探取真实地面 Z（平台顶 / 下方地形）。
+        // EleGround 已不忽略电梯本体(0.2.153x4) ⇒ 平台=合法地面，不会穿透到下方地形。
+        auto WT_EleTraceFloorZ = [&](const FVector& At, float& OutZ) -> bool
         {
-            FVector EleRight = FVector(EleDir.Y, -EleDir.X, 0.f); // = 玩家右手边（面向塔）
-            EleRight.Z = 0.f;
-            EleRight.Normalize();
-            EleAnchor += EleRight * 500.f;
-        }
-
-        const FString EleKey = FString::Printf(TEXT("Ele|%s"), *Target->GetPathName());
-        const FWT_LandSpot Spot = WT_SearchLandingSpot(World, Character, Target, EleDir, EleSrc,
-                                                       EleGround, EleOverlap, EleKey,
-                                                       TEXT("teleport-spaceelev"),
-                                                       /*StandoffOverride=*/EleStandoff,
-                                                       /*AnchorOverride=*/&EleAnchor);
-        if (Spot.bFound)
-        {
-            // ★0.2.153x6 用户 2026-10-23 实测：落点 XY 已对（平台正前方/边缘），但竖直落到了
-            // 平台下方草地（floor=Landscape，floorZ≈-3836，比平台顶面 -3487 低约 3.5m）。
-            // 用户拍板：把最终落点竖直抬升 400cm（4m）正好贴到平台面。仅作用于电梯落点，
-            // 不动枢纽/建筑分支；本地已先由 WT_SearchLandingSpot 落到草地，这里再抬一次。
-            const FVector EleLiftDest = Spot.Dest + FVector(0.f, 0.f, 400.f);
-            Character->SetActorLocation(EleLiftDest, /*bSweep=*/false, nullptr,
-                                        ETeleportType::TeleportPhysics);
-            WT_WARNF(TEXT("[teleport-spaceelev] lift+400 applied: raw=%s -> lifted=%s"),
-                     *Spot.Dest.ToString(), *EleLiftDest.ToString());
-            // 落点坐标已绕塔偏移到入口正前方，落地后面向塔即可（不再额外偏航）。
-            WT_FaceTarget(Character, Target->GetActorLocation());
-            if (Spot.bFromCache)
+            FHitResult FH;
+            if (World->LineTraceSingleByChannel(FH,
+                    FVector(At.X, At.Y, At.Z + 600.f),
+                    FVector(At.X, At.Y, At.Z - 1500.f),
+                    ECC_Pawn, EleGround))
             {
-                WT_ScheduleTeleportGroundFix(World, Character, EleKey, Target);
+                OutZ = FH.ImpactPoint.Z;
+                return true;
             }
-            WT_WARNF(TEXT("[teleport-result] '%s' -> dest=%s (space elevator landing path, lifted)"),
-                     *Target->GetName(), *EleLiftDest.ToString());
+            return false;
+        };
+
+        // —— 确定性落点 + 防嵌塔：嵌塔则沿本地 +Y 继续外推（仍在本地系，旋转安全）——
+        bool bPlaced = false;
+        FVector EleDest = FVector::ZeroVector;
+        int32 UsedPush = 0;
+        for (int32 Push = 0; (Push < 6) && !bPlaced; ++Push)
+        {
+            // 本地落点（入口中线外推 + 右偏），再变换到世界 —— 旋转安全的核心
+            const FVector LocalLand(EleRightOff, 2000.f + EleStandout + 200.f * Push, 0.f);
+            const FVector WorldLand = EleT.TransformPosition(LocalLand);
+            float LZ = 0.f;
+            if (!WT_EleTraceFloorZ(WorldLand, LZ))
+            {
+                // navmesh 兜底
+                UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+                FNavLocation NavLoc;
+                if (NavSys && NavSys->ProjectPointToNavigation(
+                        FVector(WorldLand.X, WorldLand.Y, WorldLand.Z + 88.f),
+                        NavLoc, FVector(200.f, 200.f, 400.f)))
+                {
+                    LZ = NavLoc.Location.Z;
+                }
+                else
+                {
+                    WT_WARNF(TEXT("[teleport-spaceelev] no-floor at world=%s push=%d - skip"),
+                             *WorldLand.ToString(), Push);
+                    continue; // 该外推点无地面，换更远点
+                }
+            }
+            // 落差哨兵：打到缝底/坑底（比落点低 >350）⇒ 换更远点
+            if (LZ < WorldLand.Z - 350.f)
+            {
+                WT_WARNF(TEXT("[teleport-spaceelev] gap at world=%s floorZ=%.0f - skip"),
+                         *WorldLand.ToString(), LZ);
+                continue;
+            }
+            const FVector TryDest = FVector(WorldLand.X, WorldLand.Y, LZ + EleCapH + 20.f);
+            // 胶囊 overlap 防嵌塔（EleOverlap 只忽略玩家，保留塔体碰撞）
+            if (World->OverlapBlockingTestByChannel(TryDest, FQuat::Identity, ECC_Pawn,
+                    FCollisionShape::MakeCapsule(EleCapR, FMath::Max(EleCapH - 2.f, 10.f)),
+                    EleOverlap))
+            {
+                WT_WARNF(TEXT("[teleport-spaceelev] overlap at world=%s push=%d - push out"),
+                         *WorldLand.ToString(), Push);
+                UsedPush = Push;
+                continue;
+            }
+            bPlaced = Character->SetActorLocation(TryDest, /*bSweep=*/false, nullptr,
+                                                 ETeleportType::TeleportPhysics);
+            if (bPlaced)
+            {
+                EleDest = TryDest;
+                UsedPush = Push;
+            }
+        }
+        if (bPlaced)
+        {
+            WT_WARNF(TEXT("[teleport-spaceelev] direct-land dest=%s (localY=%.0f right=%.0f push=%d)"),
+                     *EleDest.ToString(), 2000.f + EleStandout, EleRightOff, UsedPush);
+            // 落点在入口正前方，落地后面向塔即可
+            WT_FaceTarget(Character, Target->GetActorLocation());
+            WT_WARNF(TEXT("[teleport-result] '%s' -> dest=%s (space elevator direct landing, rotation-safe)"),
+                     *Target->GetName(), *EleDest.ToString());
             Client_NotifyTeleport(Target, true, WTTeleportFail::None);
             return;
         }
