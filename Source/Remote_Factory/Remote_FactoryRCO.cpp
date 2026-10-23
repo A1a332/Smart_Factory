@@ -1389,7 +1389,13 @@ static FWT_LandSpot WT_SearchLandingSpot(UWorld* World, AFGCharacterPlayer* Char
         }
         const int32 Di = Plan[Ci].DirIdx;
         const float Standoff = StandoffBase + 100.f * Plan[Ci].Ring;
-        const FVector Candidate = Anchor + LandDirs[Di] * Standoff;
+        // ★0.2.153x5：候选点 Z 抬到 GroundRefZ（锚点正下方自然地面 / 平台顶面），
+        // 否则电梯这类「actor 原点埋在平台下方」的目标，探地射线起点低于平台顶面，
+        // 永远穿透平台打到下方地形（floor='Landscape'）——落点永不上平台。
+        const FVector Candidate(
+            Anchor.X + LandDirs[Di].X * Standoff,
+            Anchor.Y + LandDirs[Di].Y * Standoff,
+            GroundRefZ);
 
         // 下探 1200 找地面（★0.2.153n：-400 打不到悬空底座下的缝底，看不出那里是个缝）
         FHitResult FloorHit;
@@ -1631,13 +1637,12 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
         // 0.2.153w 的「bbox 顶 - 150」锚点实测失败：塔 bbox 顶伸到 Z≈560 万（天上），
         // 16 候选全 no-floor、缓存兜底落回 v 版旧点 ⇒ 废弃 bbox 锚定，锚点回到 pivot。
         // 0.2.153 早期 250cm 死数字实测「正中心动不了」：塔身底座占中心 ⇒ 起跳距
-        // 固定 1700cm（0.2.153x4 用户拍板：要落在基座平台上，不落塔外草地——
-        // 平台可站环带约 12~20m，17m ≈ 平台前部（用户截图红框区域）；此前 2200 实锤落
-        // 草地 floor='Landscape'，16m 版实锤「平台穿透后放进平台体被挤到边缘」）；
+        // 固定 2150cm（21.5m）：用户 2026-10-23 实测——18~23m 区间内真正落在基座平台上的点
+        // 约在 21.5m；0.2.153x5 已把候选点 Z 抬到 GroundRefZ 让平台顶面可被探地射线命中，本值即平台落点。
         // 方向 = 自身 forward（authored 正面）绕塔左转 120°（0.2.153x2），
         // 走枢纽终端同款 8 向扇搜 + overlap 防嵌塔/嵌平台，失败沿 Ring 继续外推。
         FVector EleAnchor = Target->GetActorLocation();
-        const float EleStandoff = 1700.f;
+        const float EleStandoff = 2150.f;
 
         // ★0.2.153x3 用户 2026-10-23：在 22m 外推基础上整体往左挪 2m（200cm）。
         // 左向 = 落点方向 EleDir 绕塔左转 90°（与 x2 左转语义一致），水平投影后归一化。
