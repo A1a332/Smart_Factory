@@ -1758,10 +1758,10 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
             // （hub-center 那支 = 「枢纽中心→终端」= 天然朝外，不参与翻转，否则会转进枢纽里。）
             LandBase = -LandBase;
             DirSrc = TEXT("terminal-fwd-flipped");
-            // ★0.2.153y：移除旧的「翻转后再右转 90°」(RotateAngleAxis(90)=UE 左转90°)。
-            // 它与下方 0.2.153x2 的用户偏航（终端 +90 左转 / 制作台 −90 右转）直接抵消，正是
-            // 「枢纽两个无效」的根因（终端 90+90=180 翻面、制作台 90−90=0 无偏移）。
-            // 现在只保留翻转确立「正对终端那一面」(front)，把 ±90 偏航完全交给 x2 段，方向语义不再互相抵消。
+            // ★0.2.153y：移除旧的「翻转后再右转 90°」(RotateAngleAxis(90)=UE 左转90°)，
+            // 让 ±90 偏航统一在下方「相对目标旋转 90°」段按类别处理（终端+90/制作台-90），
+            // 避免与基准翻转叠加导致方向抵消——正是早期「枢纽两个无效」的根因。
+            // 现在只保留翻转确立「正对终端那一面」(front)。
             if (LandBase.SizeSquared() < KINDA_SMALL_NUMBER)
             {
                 const FVector AxisExt = bHaveHubBox ? HubBox.GetExtent() : FVector(1.f, 0.f, 0.f);
@@ -1775,24 +1775,24 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
             DirSrc = TEXT("to-player");
         }
         LandBase.Normalize();
-        // ★0.2.153x2 用户实测：落点坐标需绕目标偏移到正对面板方位（非仅落地后转视角）。
-        // 终端左转 90°(+)、制作台(等集成建筑)右转 90°(-)；与 0.2.153x 落地后视角符号一致。
+        // 相对目标旋转 90°（用户定案：终端左转 +90°、制作台/集成建筑右转 -90°）。
+        // 作用在「基准落点方向」(terminal-fwd-flipped 正对面板 / hub-center 朝外) 之上，
+        // 即「在当前坐标上相对旋转 90°」；删除早期混乱的 x2 独立偏航段与落地视角转向。
         {
             const float HubLandYaw = (Cast<AFGBuildableHubTerminal>(Target) != nullptr) ? 90.f : -90.f;
             LandBase = LandBase.RotateAngleAxis(HubLandYaw, FVector::UpVector);
             LandBase.Normalize();
         }
-        // ★0.2.153q 落点搜索统一走 WT_SearchLandingSpot（与普通建筑完全同一套，见函数注释）。
-        // 本分支只保留枢纽专属准备：忽略集（终端 + 枢纽本体及其挂件）、方向基准（终端朝向
-        // 翻转 180° 再右转 90°，0.2.153o/o2 用户实测定案）、以及落点表键 Hub|<对象路径名>。
+        // 落点搜索统一走 WT_SearchLandingSpot（与普通建筑完全同一套）。
+        // 本分支只保留枢纽专属准备：忽略集（终端 + 枢纽本体及其挂件）、
+        // 方向基准（终端朝向翻转 180° 正对面板 / hub-center 朝外）、落点表键 Hub|<对象路径名>。
         const FString HubKey = WT_HubSpotKey(Target);
         const FWT_LandSpot Spot = WT_SearchLandingSpot(World, Character, Target, LandBase, DirSrc,
                                                        GroundTrace, LandOverlapQ,
                                                        HubKey, TEXT("teleport-hub"));
         if (Spot.bFound)
         {
-            // ★0.2.153x2 落点坐标已偏移到正对面板，落地后面向目标即可（不再额外偏航）。
-            WT_FaceTarget(Character, TLoc);
+            // 落地后不额外转视角（删除早期视角转向）：落点坐标已偏移到目标侧，保持传送前朝向。
             if (Spot.bFromCache)
             {
                 // 查表直传：目的地区块可能刚开始流送，0.6s 后补一次地面校正
