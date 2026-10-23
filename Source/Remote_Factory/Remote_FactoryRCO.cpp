@@ -1849,6 +1849,17 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
         if (Hub)
         {
             LandOverlapQ.AddIgnoredActor(Hub);
+            // ★0.2.153z2：同时忽略 Hub 的挂接组件（平台/栏杆/楼梯等）——这些随 Hub 走、不算「外国结构」。
+            // 否则平台自身碰撞会把 ±90° 那档落点误判「卡结构」全 reject，落点永远落不进平台。
+            TArray<AActor*> HubAttached;
+            Hub->GetAttachedActors(HubAttached, /*bResetArray=*/true, /*bRecursivelyIncludeAttachedActors=*/true);
+            for (AActor* A : HubAttached)
+            {
+                if (A)
+                {
+                    LandOverlapQ.AddIgnoredActor(A);
+                }
+            }
         }
 
 
@@ -1908,16 +1919,107 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
         // 相对目标旋转 90°（用户定案：终端左转 +90°、制作台/集成建筑右转 -90°）。
         // 作用在「基准落点方向」(terminal-fwd-flipped 正对面板 / hub-center 朝外) 之上，
         // 即「在当前坐标上相对旋转 90°」；删除早期混乱的 x2 独立偏航段与落地视角转向。
-        {
-            const float HubLandYaw = (Cast<AFGBuildableHubTerminal>(Target) != nullptr) ? 90.f : -90.f;
-            LandBase = LandBase.RotateAngleAxis(HubLandYaw, FVector::UpVector);
-            LandBase.Normalize();
-        }
-        // 落点搜索统一走 WT_SearchLandingSpot（与普通建筑完全同一套）。
-        // 本分支只保留枢纽专属准备：忽略集（终端 + 玩家 + 枢纽本体（0.2.153z 为 3m 内定标忽略））、
-        // 方向基准（终端朝向翻转 180° 正对面板 / hub-center 朝外）、落点表键 Hub|<对象路径名>。
-        // ★0.2.153z 3m 内定标：固定起跳距 300cm（恢复近场≤3m 优先），最大外推封顶 300cm（不跑远）。
+        const float HubLandYaw = (Cast<AFGBuildableHubTerminal>(Target) != nullptr) ? 90.f : -90.f;
+        LandBase = LandBase.RotateAngleAxis(HubLandYaw, FVector::UpVector);
+        LandBase.Normalize();
+        // ★0.2.153z2 枢纽落点改为「沿指定 ±90° 方向直接计算」——修复「±90° 无效」：
+        // 旧 WT_SearchLandingSpot 是 8 向自由搜索，前 5 向（0/±45/±90）代价相同，并不受 ±90° 约束；
+        // 一旦 ±90° 那条被独立设备挡住就溜到 front/其它方向，用户定的「终端左90/制作台右90」根本不生效。
+        // 现直接沿已转 ±90° 的 LandBase 方向、在 ≤3m 内取最近合法点（确定性落点，镜像电梯分支）。
         const FString HubKey = WT_HubSpotKey(Target);
+        const FVector HubAnchor = TLoc;   // 以终端/制作台本尊为锚，落点 = 锚 + 方向 * 距离（目标侧 3m 内）
+        const UCapsuleComponent* HubCap = Character->GetCapsuleComponent();
+        const float HubCapH = HubCap ? HubCap->GetScaledCapsuleHalfHeight() : 90.f;
+        const float HubCapR = HubCap ? HubCap->GetScaledCapsuleRadius() : 60.f;
+        const FCollisionShape HubTestShape = FCollisionShape::MakeCapsule(
+            FMath::Max(HubCapR * 0.65f, 28.f), FMath::Max(HubCapH - 2.f, 10.f));
+        const FVector HubFinalDir = LandBase;  // 已是「基准方向 + ±90°」后的归一化落点方向
+
+        auto WT_HubTraceFloorZ = [&](const FVector& At, float& OutZ) -> bool
+        {
+            FHitResult FH;
+            if (World->LineTraceSingleByChannel(FH,
+                    FVector(At.X, At.Y, At.Z + 600.f),
+                    FVector(At.X, At.Y, At.Z - 1500.f),
+                    ECC_Pawn, GroundTrace))
+            {
+                OutZ = FH.ImpactPoint.Z;
+                return true;
+            }
+            return false;
+        };
+
+        // 距离档全部 ≤3m（用户定案「都要在3米内」）；被挡则沿同方向收近，绝不往外推
+        static const float HubDist[5] = { 300.f, 270.f, 240.f, 210.f, 180.f };
+        bool bHubPlaced = false;
+        FVector HubDest = FVector::ZeroVector;
+        for (int32 Hd = 0; (Hd < 5) && !bHubPlaced; ++Hd)
+        {
+            const FVector WorldLand = HubAnchor + HubFinalDir * HubDist[Hd];
+            float LZ = 0.f;
+            if (!WT_HubTraceFloorZ(WorldLand, LZ))
+            {
+                UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+                FNavLocation NavLoc;
+                if (NavSys && NavSys->ProjectPointToNavigation(
+                        FVector(WorldLand.X, WorldLand.Y, WorldLand.Z + 88.f),
+                        NavLoc, FVector(200.f, 200.f, 400.f)))
+                {
+                    LZ = NavLoc.Location.Z;
+                }
+                else
+                {
+                    WT_WARNF(TEXT("[teleport-hub] no-floor at world=%s dist=%.0f - skip"),
+                             *WorldLand.ToString(), HubDist[Hd]);
+                    continue;
+                }
+            }
+            if (LZ < WorldLand.Z - 350.f)  // 落差哨兵：缝/坑底
+            {
+                WT_WARNF(TEXT("[teleport-hub] gap at world=%s floorZ=%.0f - skip"),
+                         *WorldLand.ToString(), LZ);
+                continue;
+            }
+            const FVector TryDest = FVector(WorldLand.X, WorldLand.Y, LZ + HubCapH + 20.f);
+            if (World->OverlapBlockingTestByChannel(TryDest, FQuat::Identity, ECC_Pawn,
+                    HubTestShape, LandOverlapQ))
+            {
+                // 诊断：列出阻挡者名字（仅在被挡时多查一次，不动判定语义）
+                TArray<FOverlapResult> Hb;
+                FString Hbn;
+                if (World->OverlapMultiByChannel(Hb, TryDest, FQuat::Identity, ECC_Pawn,
+                        HubTestShape, LandOverlapQ))
+                {
+                    for (const FOverlapResult& OV : Hb)
+                    {
+                        if (AActor* BA = OV.GetActor()) { Hbn += BA->GetName() + TEXT(" "); }
+                        else if (UPrimitiveComponent* BC = OV.GetComponent()) { Hbn += BC->GetName() + TEXT(" "); }
+                    }
+                }
+                WT_WARNF(TEXT("[teleport-hub] overlap at world=%s dist=%.0f by=[%s] - try closer"),
+                         *WorldLand.ToString(), HubDist[Hd], *Hbn);
+                continue;
+            }
+            if (!Character->SetActorLocation(TryDest, /*bSweep=*/false, nullptr, ETeleportType::TeleportPhysics))
+            {
+                WT_WARNF(TEXT("[teleport-hub] move-reject at %s dist=%.0f"), *TryDest.ToString(), HubDist[Hd]);
+                continue;
+            }
+            bHubPlaced = true;
+            HubDest = TryDest;
+        }
+        if (bHubPlaced)
+        {
+            WT_SaveHubSpot(HubKey, HubDest);
+            WT_WARNF(TEXT("[teleport-result] '%s' -> dest=%s (hub directed %s yaw=%.0f dist=%.0f)"),
+                     *Target->GetName(), *HubDest.ToString(),
+                     (Cast<AFGBuildableHubTerminal>(Target) != nullptr) ? TEXT("terminal+90") : TEXT("craft-90"),
+                     HubLandYaw, (HubDest - HubAnchor).Size());
+            Client_NotifyTeleport(Target, true, WTTeleportFail::None);
+            return;
+        }
+        // ★0.2.153z2 兜底：±90° 方向 3m 内全被独立设备/墙挡死，退回旧 8 向搜索（落点可能不在 ±90°，仅保不卡死）
+        WT_WARNF(TEXT("[teleport-hub] directed±90 blocked, fallback 8-fan (yaw=%.0f)"), HubLandYaw);
         const FWT_LandSpot Spot = WT_SearchLandingSpot(World, Character, Target, LandBase, DirSrc,
                                                        GroundTrace, LandOverlapQ,
                                                        HubKey, TEXT("teleport-hub"),
