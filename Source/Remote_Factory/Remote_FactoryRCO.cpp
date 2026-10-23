@@ -1577,13 +1577,17 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
     AFGBuildableSpaceElevator* Elevator = Cast<AFGBuildableSpaceElevator>(Target);
     if (Elevator)
     {
-        // ★0.2.153x11 用户实测 x10「抄原版」：日志实锤两次 bMoved=0——电梯 pivot(Z=3500)
-        // 比地形(3800)还低 300，胶囊嵌进塔基几何体，引擎 FindTeleportSpot 推出失败 → TeleportTo
-        // 返回 false → UI 弹「传送已取消」。原版蓝图(K2_TeleportTo pivot)在当前游戏版本同样死法。
-        // 修复 = x9 本地系确定性落点(旋转安全，TransformPosition 跟随建筑旋转/平移) 为主体，
-        // 落点定好后先走原版引擎 TeleportTo 防嵌（不嵌=原位落，嵌了引擎自动推出），
-        // 失败再回退 SetActorLocation（x9 实测可落）。一手几何（se_dump_trace.txt SCS）：
-        // 货物传送入口 Input4~6 本地 relLoc X=1500 Y=+2000 朝外(+Y) ⇒ 本地 +Y=入口朝外方向。
+        // ★0.2.153x12 用户实测 x11「本地系 TransformPosition」：旋转建筑落点仍全错。
+        // 根因（dump 一手 + 现象闭环）：电梯旋转被烘焙进子组件 relRot（Input5 relRot y=90），
+        // actor 根变换(GetActorTransform) 停在放置朝向、不随玩家旋转更新 ⇒ TransformPosition(本地+Y)
+        // 永远落在旧朝向一侧 ⇒ 一转建筑坐标全错。
+        // 修复 = 改读建筑「真实入口组件」的世界变换（引擎合成，含子组件 relRot，旋转真跟随）：
+        //   EleCenter = Target->GetActorLocation()（绕自身旋转，中心不变）
+        //   EleOutward= Entrance->GetForwardVector()（入口组件世界前向，真朝向；兜 GetActorForwardVector）
+        //   EleRight  = EleOutward × Up（水平右向，正=玩家右手边）
+        //   WorldLand = EleCenter + EleOutward*(Standoff+200*Push) + EleRight*RightOff
+        // 落点定好后仍走原版引擎 TeleportTo 防嵌 → 失败回退 SetActorLocation（x10/x11 精神保留）。
+        // 零手算魔法世界角，彻底满足「别写偏移、跟随建筑」铁律。
         FCollisionQueryParams EleGround(SCENE_QUERY_STAT(WT_EleLanding), /*bTraceComplex=*/false);
         EleGround.AddIgnoredActor(Character);
         {
@@ -1614,10 +1618,32 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
             }
         }
 
-        const FTransform EleT = Target->GetActorTransform();
-        // —— 落点本地系参数（旋转无关；调参只改这两行）——
-        const float EleStandout = 150.f;   // 入口(Y=2000)再外推 ⇒ 落点本地 Y=2150（18~23m 平台落点定标）
-        const float EleRightOff = 0.f;     // 本地 X 右偏：落地面向塔(本地 -Y)右手边=本地 -X，右偏填负值
+        // —— 真实入口组件（旋转跟随锚）：中部货物输入 Input5，dump 实锤本地(1500,2000,100) 朝外 relRot y=90 ——
+        USceneComponent* EleEntrance = nullptr;
+        for (UActorComponent* Comp : Target->GetComponents())
+        {
+            if (Comp && Comp->GetName().Contains(TEXT("Input5")))
+            {
+                if (USceneComponent* SC = Cast<USceneComponent>(Comp)) { EleEntrance = SC; break; }
+            }
+        }
+        if (!EleEntrance)  // 兜底：任意 +Y 侧 Input（前脸货物输入 Input4~6）
+        {
+            for (UActorComponent* Comp : Target->GetComponents())
+            {
+                if (Comp && Comp->GetName().Contains(TEXT("Input")) && Cast<USceneComponent>(Comp))
+                {
+                    USceneComponent* SC = Cast<USceneComponent>(Comp);
+                    if (SC->GetRelativeLocation().Y > 0.f) { EleEntrance = SC; break; }
+                }
+            }
+        }
+        const FVector EleCenter = Target->GetActorLocation();
+        const FVector EleOutward = (EleEntrance ? EleEntrance->GetForwardVector() : Target->GetActorForwardVector()).GetSafeNormal();
+        const FVector EleRight = FVector::CrossProduct(EleOutward, FVector::UpVector).GetSafeNormal(); // 水平右向
+        // —— 落点参数（旋转无关；调参只改这两行）——
+        const float EleStandout = 2150.f;  // 沿真实正前方外推 21.5m（入口正前方平台落点定标，18~23m）
+        const float EleRightOff = 0.f;     // 沿真实右向手偏（右偏填正值；旋转安全，取自组件世界朝向）
         const UCapsuleComponent* EleCap = Character->GetCapsuleComponent();
         const float EleCapH = EleCap ? EleCap->GetScaledCapsuleHalfHeight() : 90.f;
         const float EleCapR = EleCap ? EleCap->GetScaledCapsuleRadius() : 60.f;
@@ -1636,14 +1662,13 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
             return false;
         };
 
-        // —— 确定性落点 + 防嵌：嵌塔则沿本地 +Y 外推重试（仍在本地系，旋转安全）——
+        // —— 确定性落点 + 防嵌：嵌塔则沿真实正前方外推重试（组件世界朝向，旋转安全）——
         bool bPlaced = false;
         FVector EleDest = FVector::ZeroVector;
         int32 UsedPush = 0;
         for (int32 Push = 0; (Push < 6) && !bPlaced; ++Push)
         {
-            const FVector LocalLand(EleRightOff, 2000.f + EleStandout + 200.f * Push, 0.f);
-            const FVector WorldLand = EleT.TransformPosition(LocalLand);
+            const FVector WorldLand = EleCenter + EleOutward * (EleStandout + 200.f * Push) + EleRight * EleRightOff;
             float LZ = 0.f;
             if (!WT_EleTraceFloorZ(WorldLand, LZ))
             {
@@ -1702,8 +1727,9 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
         }
         if (bPlaced)
         {
-            WT_WARNF(TEXT("[teleport-spaceelev] direct-land dest=%s (localY=%.0f right=%.0f push=%d)"),
-                     *EleDest.ToString(), 2000.f + EleStandout, EleRightOff, UsedPush);
+            WT_WARNF(TEXT("[teleport-spaceelev] direct-land dest=%s (standoff=%.0f right=%.0f push=%d entrance=%s)"),
+                     *EleDest.ToString(), EleStandout, EleRightOff, UsedPush,
+                     EleEntrance ? *EleEntrance->GetName() : TEXT("none"));
             // 落点在入口正前方，落地后面向塔即可
             WT_FaceTarget(Character, Target->GetActorLocation());
             WT_WARNF(TEXT("[teleport-result] '%s' -> dest=%s (space elevator direct landing, rotation-safe)"),
