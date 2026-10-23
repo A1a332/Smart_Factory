@@ -1253,7 +1253,9 @@ static FWT_LandSpot WT_SearchLandingSpot(UWorld* World, AFGCharacterPlayer* Char
                                          const TCHAR* DirSrc,
                                          const FCollisionQueryParams& GroundTrace,
                                          const FCollisionQueryParams& LandOverlapQ,
-                                         const FString& SpotKey, const TCHAR* LogTag)
+                                         const FString& SpotKey, const TCHAR* LogTag,
+                                         float StandoffOverride = 0.f,
+                                         const FVector* AnchorOverride = nullptr)
 {
     FWT_LandSpot Out;
     Out.Dest = FVector::ZeroVector;
@@ -1264,7 +1266,8 @@ static FWT_LandSpot WT_SearchLandingSpot(UWorld* World, AFGCharacterPlayer* Char
         return Out;
     }
 
-    const FVector Anchor = Target->GetActorLocation();
+    // ★0.2.153x：AnchorOverride 由调用方显式给定（电梯=塔基座 pivot），否则回退 actor 位置。
+    const FVector Anchor = (AnchorOverride != nullptr) ? *AnchorOverride : Target->GetActorLocation();
     const UCapsuleComponent* Cap = Character->GetCapsuleComponent();
     const float CapH = Cap ? Cap->GetScaledCapsuleHalfHeight() : 90.f;
     const float CapR = Cap ? Cap->GetScaledCapsuleRadius() : 60.f;
@@ -1272,13 +1275,22 @@ static FWT_LandSpot WT_SearchLandingSpot(UWorld* World, AFGCharacterPlayer* Char
 
     // ① 起跳距现场推导（★0.2.153i：取代 0.2.153c 的「hub bbox 半宽 +100」——那个死数字正是
     // 「落在终端 10 米外」的根因；★0.2.153q 推广到所有建筑：建筑多大多宽就从多远起跳）。
+    // ★0.2.153x：StandoffOverride>0 时直接采用调用方给定固定起跳距（电梯塔 bbox 巨大，用 bbox
+    // 推导会把起跳距推到几十米外 ⇒ 落点全灭；用户定案固定 1000cm/10m），跳过 bbox 推导。
     float StandoffBase = 150.f; // 目标无有效包围盒时的兜底（≈旧「交互范围内」语义）
-    const FBox TBox = Target->GetComponentsBoundingBox();
-    if (TBox.IsValid != 0)
+    if (StandoffOverride > 0.f)
     {
-        const FVector TExt = TBox.GetExtent();
-        const float Radius = FMath::Abs(TExt.X * LandBase.X) + FMath::Abs(TExt.Y * LandBase.Y);
-        StandoffBase = Radius + CapR + 10.f;
+        StandoffBase = StandoffOverride;
+    }
+    else
+    {
+        const FBox TBox = Target->GetComponentsBoundingBox();
+        if (TBox.IsValid != 0)
+        {
+            const FVector TExt = TBox.GetExtent();
+            const float Radius = FMath::Abs(TExt.X * LandBase.X) + FMath::Abs(TExt.Y * LandBase.Y);
+            StandoffBase = Radius + CapR + 10.f;
+        }
     }
 
     // ② 高度基准（第五轮定案）：锚点正下方的自然地面 Z。
@@ -1539,6 +1551,101 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
     // 故“终端朝向” = 玩家所在方向 = 函数上文已算好的 ToPlayer(已归一化、压平)。
     // 落点 = 终端位置 + ToPlayer × 150(≈1.5m，交互范围内)；下探找地面(忽略终端/枢纽组件/玩家自身)，
     // 带 sweep 的 SetActorLocation 落位并验证不嵌物体；主方向失败仅做同距(≤1.5m)小幅旋转兜底，绝不扩距离、不爬房顶。
+    // ★0.2.153v 太空电梯专用落点（用户 2026-10-23 实测：落点随机、距终端约 100 单位、
+    // 未落入塔底交互范围）。SDK 一手实锤：AFGBuildableSpaceElevator
+    // （FGBuildableSpaceElevator.h:51）无任何终端位置接口，交互靠玩家准星 trace 塔身
+    // （FGBuildable.h:734 只有 GetInteractWidgetClass）⇒ 落点只要靠近塔身即可交互。
+    // 通用算法（bld 分支）对它失效的根因：
+    //   ① 塔 bbox 水平半径大 ⇒ WT_SearchLandingSpot 按 bbox 推导 StandoffBase，
+    //      Ring0 就在塔基外沿，近场候选全被 overlap/gap 哨兵 reject；
+    //   ② 宽松阶段（Ring≥10）跳过 overlap 只做头顶净空 ⇒ 落点跑到 10m 开外且可能
+    //      塞进塔基（与枢纽 bug② 同源），表现即「落点随机、不在交互范围」。
+    // 专用分支：方向 = 自身 forward（authored 正面），走枢纽终端同款 8 向扇搜 +
+    // overlap 保留塔体碰撞防嵌墙；起跳距见下方 0.2.153x 定案（1000cm/10m），全灭则拒传。
+    AFGBuildableSpaceElevator* Elevator = Cast<AFGBuildableSpaceElevator>(Target);
+    if (Elevator)
+    {
+        FCollisionQueryParams EleGround(SCENE_QUERY_STAT(WT_EleLanding), /*bTraceComplex=*/false);
+        EleGround.AddIgnoredActor(Target);
+        EleGround.AddIgnoredActor(Character);
+        {
+            TArray<AActor*> Attached;
+            Target->GetAttachedActors(Attached, /*bResetArray=*/true,
+                                      /*bRecursivelyIncludeAttachedActors=*/true);
+            for (AActor* A : Attached)
+            {
+                if (A)
+                {
+                    EleGround.AddIgnoredActor(A);
+                }
+            }
+        }
+        // 查卡不卡用另一套：只忽略玩家与电梯本体，保留其它一切真实碰撞体。
+        FCollisionQueryParams EleOverlap(SCENE_QUERY_STAT(WT_EleLandOverlap), /*bTraceComplex=*/false);
+        EleOverlap.AddIgnoredActor(Target);
+        EleOverlap.AddIgnoredActor(Character);
+        {
+            TArray<AActor*> Attached2;
+            Target->GetAttachedActors(Attached2, /*bResetArray=*/true,
+                                      /*bRecursivelyIncludeAttachedActors=*/true);
+            for (AActor* A : Attached2)
+            {
+                if (A)
+                {
+                    EleOverlap.AddIgnoredActor(A);
+                }
+            }
+        }
+
+        FVector EleDir = Target->GetActorForwardVector();
+        EleDir.Z = 0.f;
+        const TCHAR* EleSrc = TEXT("spaceelev-fwd");
+        if (EleDir.SizeSquared() < KINDA_SMALL_NUMBER)
+        {
+            EleDir = ToPlayer; // forward 全竖直（理论上不存在）时的无害兜底
+            EleSrc = TEXT("spaceelev-to-player");
+        }
+        EleDir.Normalize();
+
+        // ★0.2.153x 用户 2026-10-23 定案：落点 = 塔基座中心（actor pivot）往外推 10m。
+        // 一手实锤（SpaceElevatorDumpTool commandlet dump Build_SpaceElevator SCS 25 节点）：
+        //   MainMesh/RootComponent relLoc=(0,0,0) ⇒ actor pivot = 塔基座底部几何中心；
+        //   Input1~6 relLoc Y=±2000 Z=100（前后缘传送带进口）；
+        //   BP_LadderComponent×4 relLoc X≈2100~2235 Y=±1280（两侧梯子）
+        //   ⇒ 基座平台可站半径约 20m，无独立「交互面板」组件（交互在 native 基类）。
+        // 0.2.153w 的「bbox 顶 - 150」锚点实测失败：塔 bbox 顶伸到 Z≈560 万（天上），
+        // 16 候选全 no-floor、缓存兜底落回 v 版旧点 ⇒ 废弃 bbox 锚定，锚点回到 pivot。
+        // 0.2.153 早期 250cm 死数字实测「正中心动不了」：塔身底座占中心 ⇒ 起跳距
+        // 固定 1000cm（用户拍板 10m）；方向 = 自身 forward（authored 正面），
+        // 走枢纽终端同款 8 向扇搜 + overlap 保留塔体碰撞防嵌墙，失败沿 Ring 继续外推。
+        FVector EleAnchor = Target->GetActorLocation();
+        const float EleStandoff = 1000.f;
+
+        const FString EleKey = FString::Printf(TEXT("Ele|%s"), *Target->GetPathName());
+        const FWT_LandSpot Spot = WT_SearchLandingSpot(World, Character, Target, EleDir, EleSrc,
+                                                       EleGround, EleOverlap, EleKey,
+                                                       TEXT("teleport-spaceelev"),
+                                                       /*StandoffOverride=*/EleStandoff,
+                                                       /*AnchorOverride=*/&EleAnchor);
+        if (Spot.bFound)
+        {
+            WT_FaceTarget(Character, Target->GetActorLocation()); // 落地转身面向电梯
+            if (Spot.bFromCache)
+            {
+                WT_ScheduleTeleportGroundFix(World, Character, EleKey, Target);
+            }
+            WT_WARNF(TEXT("[teleport-result] '%s' -> dest=%s (space elevator landing path)"),
+                     *Target->GetName(), *Spot.Dest.ToString());
+            Client_NotifyTeleport(Target, true, WTTeleportFail::None);
+            return;
+        }
+        // 全灭（多为塔基周围区块未流送/结构遮挡）：拒绝传送，玩家靠近后再试。
+        WT_WARNF(TEXT("[teleport-spaceelev] no safe landing near '%s' at %s - refused"),
+                 *Target->GetName(), *Target->GetActorLocation().ToString());
+        Client_NotifyTeleport(Target, false, WTTeleportFail::NoSafeLanding);
+        return;
+    }
+
     AFGBuildableTradingPost* Hub = Target->GetTypedOuter<AFGBuildableTradingPost>();
     const bool bIsHubRelated = (Cast<AFGBuildableHubTerminal>(Target) != nullptr)
                             || (Hub != nullptr)
