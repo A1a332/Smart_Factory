@@ -1571,8 +1571,13 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
     AFGBuildableSpaceElevator* Elevator = Cast<AFGBuildableSpaceElevator>(Target);
     if (Elevator)
     {
+        // ★0.2.153x4 用户 2026-10-23 实测定案：不忽略电梯本体！
+        // 基座平台是电梯的组件——此前 EleGround 忽略 Target，平台上候选的地面 trace
+        // 直接穿透平台打到下方地形（日志实锤：16m/22m 版 Ring0 一次命中且 floor='Landscape'），
+        // 玩家被放进平台体再被物理挤到平台边缘（=历次「卡边界线」根因）；
+        // standoff 提到 2200 后候选直接落塔外草地（用户截图：要落平台，不要草地）。
+        // 不忽略后：平台=合法地面；塔身碰撞仍保留 = 继续防嵌塔（方向不变、纪律更强）。
         FCollisionQueryParams EleGround(SCENE_QUERY_STAT(WT_EleLanding), /*bTraceComplex=*/false);
-        EleGround.AddIgnoredActor(Target);
         EleGround.AddIgnoredActor(Character);
         {
             TArray<AActor*> Attached;
@@ -1586,9 +1591,9 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
                 }
             }
         }
-        // 查卡不卡用另一套：只忽略玩家与电梯本体，保留其它一切真实碰撞体。
+        // 查卡不卡用另一套：只忽略玩家（电梯本体 0.2.153x4 起不再忽略——防嵌平台，见上），
+        // 保留其它一切真实碰撞体。
         FCollisionQueryParams EleOverlap(SCENE_QUERY_STAT(WT_EleLandOverlap), /*bTraceComplex=*/false);
-        EleOverlap.AddIgnoredActor(Target);
         EleOverlap.AddIgnoredActor(Character);
         {
             TArray<AActor*> Attached2;
@@ -1626,11 +1631,13 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
         // 0.2.153w 的「bbox 顶 - 150」锚点实测失败：塔 bbox 顶伸到 Z≈560 万（天上），
         // 16 候选全 no-floor、缓存兜底落回 v 版旧点 ⇒ 废弃 bbox 锚定，锚点回到 pivot。
         // 0.2.153 早期 250cm 死数字实测「正中心动不了」：塔身底座占中心 ⇒ 起跳距
-        // 固定 2200cm（用户拍板 22m：20m 实测仍不够，再外推 2m）；
+        // 固定 1700cm（0.2.153x4 用户拍板：要落在基座平台上，不落塔外草地——
+        // 平台可站环带约 12~20m，17m ≈ 平台前部（用户截图红框区域）；此前 2200 实锤落
+        // 草地 floor='Landscape'，16m 版实锤「平台穿透后放进平台体被挤到边缘」）；
         // 方向 = 自身 forward（authored 正面）绕塔左转 120°（0.2.153x2），
-        // 走枢纽终端同款 8 向扇搜 + overlap 保留塔体碰撞防嵌墙，失败沿 Ring 继续外推。
+        // 走枢纽终端同款 8 向扇搜 + overlap 防嵌塔/嵌平台，失败沿 Ring 继续外推。
         FVector EleAnchor = Target->GetActorLocation();
-        const float EleStandoff = 2200.f;
+        const float EleStandoff = 1700.f;
 
         // ★0.2.153x3 用户 2026-10-23：在 22m 外推基础上整体往左挪 2m（200cm）。
         // 左向 = 落点方向 EleDir 绕塔左转 90°（与 x2 左转语义一致），水平投影后归一化。
