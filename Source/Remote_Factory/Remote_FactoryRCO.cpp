@@ -1586,7 +1586,7 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
         //   EleOutward= Entrance->GetForwardVector()（入口组件世界前向，真朝向；兜 GetActorForwardVector）
         //   EleRight  = EleOutward × Up（水平右向，正=玩家右手边）
         //   WorldLand = EleCenter + EleDir*(Standoff+200*Push) + EleRight*RightOff
-        //             （EleDir = 入口前向绕塔偏航后的落点方向；复刻 x2「绕塔左转120°」老行为）
+        //             （EleDir = 入口前向绕塔偏航后的落点方向；x15 红框定标：入口正前 ~11m 紧贴基座平台边缘）
         // 落点定好后仍走原版引擎 TeleportTo 防嵌 → 失败回退 SetActorLocation（x10/x11 精神保留）。
         // 零手算魔法世界角，彻底满足「别写偏移、跟随建筑」铁律。
         FCollisionQueryParams EleGround(SCENE_QUERY_STAT(WT_EleLanding), /*bTraceComplex=*/false);
@@ -1643,9 +1643,8 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
         const FVector EleOutward = (EleEntrance ? EleEntrance->GetForwardVector() : Target->GetActorForwardVector()).GetSafeNormal();
         const FVector EleRight = FVector::CrossProduct(EleOutward, FVector::UpVector).GetSafeNormal(); // 水平右向
         // —— 落点参数（旋转无关；调参只改这几行）——
-        const float EleYawOff   = 30.f;    // 落点方向相对「入口前向」的偏航（度，绕世界Up）。入口前向=actor forward+90（Input5 relRot y=90），
-                                           // +30 ⇒ 相对 actor forward 恰为 +120 = 复刻 x2「绕塔左转120°」老落点（x13 填120多转了90°，实测落偏）
-        const float EleStandout = 2150.f;  // 沿（绕塔偏航后的）落点方向外推 21.5m（入口平台落点定标，18~23m）
+        const float EleYawOff   = 0.f;     // 落点方向相对「入口前向」的偏航（度，绕世界Up）。0=正对入口；x15 红框定标：基座右前角≈入口正前
+        const float EleStandout = 1100.f;  // 沿落点方向外推 11m（x15 红框定标：紧贴基座平台边缘；x14 的 21.5m 远场+push 只往外推，永远落不进框）
         const float EleRightOff = 0.f;     // 沿真实右向手偏（右偏填正值；旋转安全，取自组件世界朝向）
         // 旋转落点方向（绕世界Up）：用 Outward/Right 线性组合，避坑 CSS 引擎 RotateAngleAxis 异常；
         // 符号取 -sin 复刻 RotateAngleAxis(+Yaw,Up) 左转语义（绕 +Z 右旋=俯视逆时针=左转）。
