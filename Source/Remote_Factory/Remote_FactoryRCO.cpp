@@ -1645,7 +1645,7 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
         // —— 落点参数（旋转无关；调参只改这几行）——
         const float EleYawOff   = 90.f;    // 落点方向相对「Input5前向」的偏航（度，绕世界Up）。x16 实锤：Input5 是传送带口、
                                            // 其前向=大门口朝外方向的左侧90°（用户观察：落点在门口偏左那侧）⇒ 朝外=前向+90，正对大门/控制台
-        const float EleStandout = 2200.f;  // 沿落点方向外推 22m：x18 落点 23m 经用户实测「再往里收1米刚刚好」→ 2200（x19）。被挡则继续往外推兜底
+        const float EleStandout = 2100.f;  // 沿落点方向外推 21m：x19 的 22m 用户实测仍偏外 → 收 1m 到 2100（x20）。被挡则继续往外推兜底
         const float EleRightOff = 0.f;     // 沿真实右向手偏（右偏填正值；旋转安全，取自组件世界朝向）
         // 旋转落点方向（绕世界Up）：用 Outward/Right 线性组合，避坑 CSS 引擎 RotateAngleAxis 异常；
         // 符号取 -sin 复刻 RotateAngleAxis(+Yaw,Up) 左转语义（绕 +Z 右旋=俯视逆时针=左转）。
