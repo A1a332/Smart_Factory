@@ -1626,10 +1626,11 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
         // 0.2.153w 的「bbox 顶 - 150」锚点实测失败：塔 bbox 顶伸到 Z≈560 万（天上），
         // 16 候选全 no-floor、缓存兜底落回 v 版旧点 ⇒ 废弃 bbox 锚定，锚点回到 pivot。
         // 0.2.153 早期 250cm 死数字实测「正中心动不了」：塔身底座占中心 ⇒ 起跳距
-        // 固定 1000cm（用户拍板 10m）；方向 = 自身 forward（authored 正面），
+        // 固定 1600cm（用户拍板 16m：在 10m 基础上再外推 6m，避开塔基碰撞边界「卡边界线」问题）；
+        // 方向 = 自身 forward（authored 正面）绕塔左转 120°（0.2.153x2），
         // 走枢纽终端同款 8 向扇搜 + overlap 保留塔体碰撞防嵌墙，失败沿 Ring 继续外推。
         FVector EleAnchor = Target->GetActorLocation();
-        const float EleStandoff = 1000.f;
+        const float EleStandoff = 1600.f;
 
         const FString EleKey = FString::Printf(TEXT("Ele|%s"), *Target->GetPathName());
         const FWT_LandSpot Spot = WT_SearchLandingSpot(World, Character, Target, EleDir, EleSrc,
@@ -1757,11 +1758,10 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
             // （hub-center 那支 = 「枢纽中心→终端」= 天然朝外，不参与翻转，否则会转进枢纽里。）
             LandBase = -LandBase;
             DirSrc = TEXT("terminal-fwd-flipped");
-            // ★0.2.153o2 用户第二轮实测定案：翻转后**再向右转 90°**（+yaw = 前(X)→右(Y)，UE 约定）。
-            // 终端的 authored forward 与「玩家站位侧」差 180°+90°：直接翻 180° 会把人放到枢纽另一面
-            // （本局日志 landed standoff=916 实锤落在 9 米外那侧）→ 再右转 90° 才是正对终端的那一面。
-            LandBase = LandBase.RotateAngleAxis(90.f, FVector::UpVector);
-            DirSrc = TEXT("terminal-fwd-flipped+right90");
+            // ★0.2.153y：移除旧的「翻转后再右转 90°」(RotateAngleAxis(90)=UE 左转90°)。
+            // 它与下方 0.2.153x2 的用户偏航（终端 +90 左转 / 制作台 −90 右转）直接抵消，正是
+            // 「枢纽两个无效」的根因（终端 90+90=180 翻面、制作台 90−90=0 无偏移）。
+            // 现在只保留翻转确立「正对终端那一面」(front)，把 ±90 偏航完全交给 x2 段，方向语义不再互相抵消。
             if (LandBase.SizeSquared() < KINDA_SMALL_NUMBER)
             {
                 const FVector AxisExt = bHaveHubBox ? HubBox.GetExtent() : FVector(1.f, 0.f, 0.f);
