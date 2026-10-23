@@ -1632,6 +1632,15 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
         FVector EleAnchor = Target->GetActorLocation();
         const float EleStandoff = 2200.f;
 
+        // ★0.2.153x3 用户 2026-10-23：在 22m 外推基础上整体往左挪 2m（200cm）。
+        // 左向 = 落点方向 EleDir 绕塔左转 90°（与 x2 左转语义一致），水平投影后归一化。
+        {
+            FVector EleLeft = EleDir.RotateAngleAxis(90.f, FVector::UpVector);
+            EleLeft.Z = 0.f;
+            EleLeft.Normalize();
+            EleAnchor += EleLeft * 200.f;
+        }
+
         const FString EleKey = FString::Printf(TEXT("Ele|%s"), *Target->GetPathName());
         const FWT_LandSpot Spot = WT_SearchLandingSpot(World, Character, Target, EleDir, EleSrc,
                                                        EleGround, EleOverlap, EleKey,
