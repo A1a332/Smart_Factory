@@ -1626,11 +1626,11 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
         // 0.2.153w 的「bbox 顶 - 150」锚点实测失败：塔 bbox 顶伸到 Z≈560 万（天上），
         // 16 候选全 no-floor、缓存兜底落回 v 版旧点 ⇒ 废弃 bbox 锚定，锚点回到 pivot。
         // 0.2.153 早期 250cm 死数字实测「正中心动不了」：塔身底座占中心 ⇒ 起跳距
-        // 固定 1600cm（用户拍板 16m：在 10m 基础上再外推 6m，避开塔基碰撞边界「卡边界线」问题）；
+        // 固定 2000cm（用户拍板 20m：16m 实测仍贴塔基边界「卡边界线」，再外推 4m）；
         // 方向 = 自身 forward（authored 正面）绕塔左转 120°（0.2.153x2），
         // 走枢纽终端同款 8 向扇搜 + overlap 保留塔体碰撞防嵌墙，失败沿 Ring 继续外推。
         FVector EleAnchor = Target->GetActorLocation();
-        const float EleStandoff = 1600.f;
+        const float EleStandoff = 2000.f;
 
         const FString EleKey = FString::Printf(TEXT("Ele|%s"), *Target->GetPathName());
         const FWT_LandSpot Spot = WT_SearchLandingSpot(World, Character, Target, EleDir, EleSrc,
