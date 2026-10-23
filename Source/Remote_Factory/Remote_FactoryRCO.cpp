@@ -1661,14 +1661,23 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
                                                        /*AnchorOverride=*/&EleAnchor);
         if (Spot.bFound)
         {
-            // ★0.2.153x2 落点坐标已绕塔偏移到入口正前方，落地后面向塔即可（不再额外偏航）。
+            // ★0.2.153x6 用户 2026-10-23 实测：落点 XY 已对（平台正前方/边缘），但竖直落到了
+            // 平台下方草地（floor=Landscape，floorZ≈-3836，比平台顶面 -3487 低约 3.5m）。
+            // 用户拍板：把最终落点竖直抬升 400cm（4m）正好贴到平台面。仅作用于电梯落点，
+            // 不动枢纽/建筑分支；本地已先由 WT_SearchLandingSpot 落到草地，这里再抬一次。
+            const FVector EleLiftDest = Spot.Dest + FVector(0.f, 0.f, 400.f);
+            Character->SetActorLocation(EleLiftDest, /*bSweep=*/false, nullptr,
+                                        ETeleportType::TeleportPhysics);
+            WT_WARNF(TEXT("[teleport-spaceelev] lift+400 applied: raw=%s -> lifted=%s"),
+                     *Spot.Dest.ToString(), *EleLiftDest.ToString());
+            // 落点坐标已绕塔偏移到入口正前方，落地后面向塔即可（不再额外偏航）。
             WT_FaceTarget(Character, Target->GetActorLocation());
             if (Spot.bFromCache)
             {
                 WT_ScheduleTeleportGroundFix(World, Character, EleKey, Target);
             }
-            WT_WARNF(TEXT("[teleport-result] '%s' -> dest=%s (space elevator landing path)"),
-                     *Target->GetName(), *Spot.Dest.ToString());
+            WT_WARNF(TEXT("[teleport-result] '%s' -> dest=%s (space elevator landing path, lifted)"),
+                     *Target->GetName(), *EleLiftDest.ToString());
             Client_NotifyTeleport(Target, true, WTTeleportFail::None);
             return;
         }
