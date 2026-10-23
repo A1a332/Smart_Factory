@@ -1577,24 +1577,144 @@ void URemote_FactoryRCO::Server_TeleportTo_Implementation(AActor* Target)
     AFGBuildableSpaceElevator* Elevator = Cast<AFGBuildableSpaceElevator>(Target);
     if (Elevator)
     {
-        // ★0.2.153x10 用户 2026-10-23 拍板「抄原版 Remote Factory（仓库名 Cellphone）」。
-        // 一手核实（_ref_Cellphone/Widget_RF.uasset 二进制串提取）原版落点链路：
-        //   GetAllActorsOfClass(Build_SpaceElevator_C) → K2_GetActorLocation(建筑 actor pivot)
-        //   → K2_TeleportTo(DestLocation, DestRotation)。
-        // 蓝图里**零偏移数学**：GetActorRotation / MakeRotator / AddVector / TransformPosition /
-        // forward / right 向量 相关节点 count 全 0；落点 = 建筑 actor 自身位置，防嵌交引擎
-        // FindTeleportSpot（TeleportTo 默认 bNoCheck=false 触发）。本地系/世界系偏移一概没有，
-        // 所以玩家怎么旋转/平移建筑都不会炸坐标——这正是之前 x2~x9 一直踩的坑。
-        // 故此处直接抄：Dest = 电梯 actor 位置，用 AActor::TeleportTo 让引擎自动把胶囊推出
-        // 塔基几何体（通常直接顶到平台顶面，落到入口平台），不写死方向/距离/偏移。
-        const FVector EleDest = Target->GetActorLocation();
-        const FRotator EleRot  = Target->GetActorRotation();
-        const bool bMoved = Character->TeleportTo(EleDest, EleRot);
-        WT_WARNF(TEXT("[teleport-spaceelev] copied-from-original dest=%s rot=%s (bMoved=%d)"),
-                 *EleDest.ToString(), *EleRot.ToString(), bMoved ? 1 : 0);
-        WT_WARNF(TEXT("[teleport-result] '%s' -> dest=%s (space elevator, original-style)"),
-                 *Target->GetName(), *EleDest.ToString());
-        Client_NotifyTeleport(Target, bMoved, bMoved ? WTTeleportFail::None : WTTeleportFail::NoSafeLanding);
+        // ★0.2.153x11 用户实测 x10「抄原版」：日志实锤两次 bMoved=0——电梯 pivot(Z=3500)
+        // 比地形(3800)还低 300，胶囊嵌进塔基几何体，引擎 FindTeleportSpot 推出失败 → TeleportTo
+        // 返回 false → UI 弹「传送已取消」。原版蓝图(K2_TeleportTo pivot)在当前游戏版本同样死法。
+        // 修复 = x9 本地系确定性落点(旋转安全，TransformPosition 跟随建筑旋转/平移) 为主体，
+        // 落点定好后先走原版引擎 TeleportTo 防嵌（不嵌=原位落，嵌了引擎自动推出），
+        // 失败再回退 SetActorLocation（x9 实测可落）。一手几何（se_dump_trace.txt SCS）：
+        // 货物传送入口 Input4~6 本地 relLoc X=1500 Y=+2000 朝外(+Y) ⇒ 本地 +Y=入口朝外方向。
+        FCollisionQueryParams EleGround(SCENE_QUERY_STAT(WT_EleLanding), /*bTraceComplex=*/false);
+        EleGround.AddIgnoredActor(Character);
+        {
+            TArray<AActor*> Attached;
+            Target->GetAttachedActors(Attached, /*bResetArray=*/true,
+                                      /*bRecursivelyIncludeAttachedActors=*/true);
+            for (AActor* A : Attached)
+            {
+                if (A)
+                {
+                    EleGround.AddIgnoredActor(A);
+                }
+            }
+        }
+        // 防嵌查询：只忽略玩家（电梯本体不忽略=平台是合法地面且防嵌平台，x4 纪律）。
+        FCollisionQueryParams EleOverlap(SCENE_QUERY_STAT(WT_EleLandOverlap), /*bTraceComplex=*/false);
+        EleOverlap.AddIgnoredActor(Character);
+        {
+            TArray<AActor*> Attached2;
+            Target->GetAttachedActors(Attached2, /*bResetArray=*/true,
+                                      /*bRecursivelyIncludeAttachedActors=*/true);
+            for (AActor* A : Attached2)
+            {
+                if (A)
+                {
+                    EleOverlap.AddIgnoredActor(A);
+                }
+            }
+        }
+
+        const FTransform EleT = Target->GetActorTransform();
+        // —— 落点本地系参数（旋转无关；调参只改这两行）——
+        const float EleStandout = 150.f;   // 入口(Y=2000)再外推 ⇒ 落点本地 Y=2150（18~23m 平台落点定标）
+        const float EleRightOff = 0.f;     // 本地 X 右偏：落地面向塔(本地 -Y)右手边=本地 -X，右偏填负值
+        const UCapsuleComponent* EleCap = Character->GetCapsuleComponent();
+        const float EleCapH = EleCap ? EleCap->GetScaledCapsuleHalfHeight() : 90.f;
+        const float EleCapR = EleCap ? EleCap->GetScaledCapsuleRadius() : 60.f;
+
+        auto WT_EleTraceFloorZ = [&](const FVector& At, float& OutZ) -> bool
+        {
+            FHitResult FH;
+            if (World->LineTraceSingleByChannel(FH,
+                    FVector(At.X, At.Y, At.Z + 600.f),
+                    FVector(At.X, At.Y, At.Z - 1500.f),
+                    ECC_Pawn, EleGround))
+            {
+                OutZ = FH.ImpactPoint.Z;
+                return true;
+            }
+            return false;
+        };
+
+        // —— 确定性落点 + 防嵌：嵌塔则沿本地 +Y 外推重试（仍在本地系，旋转安全）——
+        bool bPlaced = false;
+        FVector EleDest = FVector::ZeroVector;
+        int32 UsedPush = 0;
+        for (int32 Push = 0; (Push < 6) && !bPlaced; ++Push)
+        {
+            const FVector LocalLand(EleRightOff, 2000.f + EleStandout + 200.f * Push, 0.f);
+            const FVector WorldLand = EleT.TransformPosition(LocalLand);
+            float LZ = 0.f;
+            if (!WT_EleTraceFloorZ(WorldLand, LZ))
+            {
+                UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+                FNavLocation NavLoc;
+                if (NavSys && NavSys->ProjectPointToNavigation(
+                        FVector(WorldLand.X, WorldLand.Y, WorldLand.Z + 88.f),
+                        NavLoc, FVector(200.f, 200.f, 400.f)))
+                {
+                    LZ = NavLoc.Location.Z;
+                }
+                else
+                {
+                    WT_WARNF(TEXT("[teleport-spaceelev] no-floor at world=%s push=%d - skip"),
+                             *WorldLand.ToString(), Push);
+                    continue;
+                }
+            }
+            // 落差哨兵：打到缝底/坑底（比落点低 >350）⇒ 换更远点
+            if (LZ < WorldLand.Z - 350.f)
+            {
+                WT_WARNF(TEXT("[teleport-spaceelev] gap at world=%s floorZ=%.0f - skip"),
+                         *WorldLand.ToString(), LZ);
+                continue;
+            }
+            const FVector TryDest = FVector(WorldLand.X, WorldLand.Y, LZ + EleCapH + 20.f);
+            if (World->OverlapBlockingTestByChannel(TryDest, FQuat::Identity, ECC_Pawn,
+                    FCollisionShape::MakeCapsule(EleCapR, FMath::Max(EleCapH - 2.f, 10.f)),
+                    EleOverlap))
+            {
+                WT_WARNF(TEXT("[teleport-spaceelev] overlap at world=%s push=%d - push out"),
+                         *WorldLand.ToString(), Push);
+                UsedPush = Push;
+                continue;
+            }
+            // 先走原版引擎 TeleportTo 防嵌（不嵌=原位落，嵌了引擎自动推出）；
+            // 引擎拒绝（嵌太深推不出，x10 实锤会这样）再回退 SetActorLocation（x9 实测可落）。
+            bPlaced = Character->TeleportTo(TryDest, Character->GetActorRotation());
+            if (bPlaced)
+            {
+                WT_WARNF(TEXT("[teleport-spaceelev] engine-teleport accepted dest=%s push=%d"),
+                         *TryDest.ToString(), Push);
+            }
+            else
+            {
+                bPlaced = Character->SetActorLocation(TryDest, /*bSweep=*/false, nullptr,
+                                                     ETeleportType::TeleportPhysics);
+                WT_WARNF(TEXT("[teleport-spaceelev] engine refused, fallback SetActorLocation dest=%s ok=%d push=%d"),
+                         *TryDest.ToString(), bPlaced ? 1 : 0, Push);
+            }
+            if (bPlaced)
+            {
+                EleDest = TryDest;
+                UsedPush = Push;
+            }
+        }
+        if (bPlaced)
+        {
+            WT_WARNF(TEXT("[teleport-spaceelev] direct-land dest=%s (localY=%.0f right=%.0f push=%d)"),
+                     *EleDest.ToString(), 2000.f + EleStandout, EleRightOff, UsedPush);
+            // 落点在入口正前方，落地后面向塔即可
+            WT_FaceTarget(Character, Target->GetActorLocation());
+            WT_WARNF(TEXT("[teleport-result] '%s' -> dest=%s (space elevator direct landing, rotation-safe)"),
+                     *Target->GetName(), *EleDest.ToString());
+            Client_NotifyTeleport(Target, true, WTTeleportFail::None);
+            return;
+        }
+        // 全灭（多为塔基周围区块未流送/结构遮挡）：拒绝传送，玩家走近后再试。
+        WT_WARNF(TEXT("[teleport-spaceelev] no safe landing near '%s' at %s - refused"),
+                 *Target->GetName(), *Target->GetActorLocation().ToString());
+        Client_NotifyTeleport(Target, false, WTTeleportFail::NoSafeLanding);
         return;
     }
 
