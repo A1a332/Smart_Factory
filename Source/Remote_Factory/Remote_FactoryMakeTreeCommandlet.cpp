@@ -77,7 +77,7 @@ int32 UWTMakeTreeCommandlet::Main(const FString& Params)
         if (UWTResearchTreeBase* CDO = Cast<UWTResearchTreeBase>(GenClass->GetDefaultObject()))
         {
             CDO->ConfigureMergedTree(
-                FText::FromString(TEXT("智能工厂")),
+                FText::FromString(TEXT("Smart Factory")),
                 FText::FromString(TEXT("Research the Smart Factory's upgrade buildings level by level in the MAM. "
                                        "Each level costs more than the last; the matching building scales automatically.")));
             const int32 N = UFGResearchTree::GetNodes(GenClass).Num();

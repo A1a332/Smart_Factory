@@ -44,7 +44,7 @@ ARemote_FactoryBuildable::ARemote_FactoryBuildable()
 
 FText ARemote_FactoryBuildable::GetTerminalDisplayName()
 {
-    return WT_LOCTEXT("Building_Remote_Factory", "智能工厂");
+    return WT_LOCTEXT("Building_Remote_Factory", "Smart Factory");
 }
 
 void ARemote_FactoryBuildable::MakeUseableWithPanel()
