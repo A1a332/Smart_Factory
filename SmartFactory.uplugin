@@ -42,12 +42,5 @@
             "Enabled": true,
             "SemVersion": "^1.0.0"
         }
-    ],
-    "LocalizationTargets": [
-        {
-            "Name": "Remote_Factory",
-            "LoadingPolicy": "Always",
-            "ConfigGenerationPolicy": "Never"
-        }
     ]
 }
