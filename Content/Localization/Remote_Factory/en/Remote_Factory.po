@@ -17,7 +17,7 @@ msgstr ""
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryBuildable.cpp(47)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryBuildable.cpp(47)
 msgid ",Building_Remote_Factory"
-msgstr "远程工厂"
+msgstr "Smart Factory"
 
 #. Key:	EquipDesc_PortableTerminal
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryEquipment.cpp(1138)
@@ -29,7 +29,7 @@ msgstr "A handheld Remote Factory. Craft it at a workbench and put it in an arm 
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryEquipment.cpp(190)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryEquipment.cpp(190)
 msgid ",Equip_PortableTerminal"
-msgstr "远程工厂"
+msgstr "Smart Factory"
 
 #. Key:	Btn_Close
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(102)
@@ -89,19 +89,19 @@ msgstr "{0}   {1}   {2}"
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(123)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(123)
 msgid ",ColState_Collected"
-msgstr "已拾取"
+msgstr "Collected"
 
 #. Key:	ColState_Uncollected
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(124)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(124)
 msgid ",ColState_Uncollected"
-msgstr "未拾取"
+msgstr "Not collected"
 
 #. Key:	Top_Building
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1244)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1244)
 msgid ",Top_Building"
-msgstr "建筑"
+msgstr "Buildings"
 
 #. Key:	Top_Container
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1245)
@@ -113,7 +113,7 @@ msgstr "容器"
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1246)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1246)
 msgid ",Top_Alien"
-msgstr "外星科技"
+msgstr "Collectibles"
 
 #. Key:	Arrow_Down
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1259)
@@ -221,7 +221,7 @@ msgstr "MAM"
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1466)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1466)
 msgid ",Btn_RowTeleport"
-msgstr "传送"
+msgstr "Teleport"
 
 #. Key:	Cat_DropPod
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(147)
@@ -245,7 +245,7 @@ msgstr "{0}   {1}m   {2}"
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1583)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1583)
 msgid ",Btn_RowOpen"
-msgstr "打开面板"
+msgstr "Open"
 
 #. Key:	Col_SlugBlue
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(170)
@@ -353,13 +353,13 @@ msgstr "Now: {0}"
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(186)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(186)
 msgid ",ColPick_Done"
-msgstr "【已拾取】"
+msgstr "[Collected]"
 
 #. Key:	ColPick_Open
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(187)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(187)
 msgid ",ColPick_Open"
-msgstr "【未拾取】"
+msgstr "[Not collected]"
 
 #. Key:	Btn_SwitchOff
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1872)
@@ -395,13 +395,13 @@ msgstr "Teleport failed: the target is gone"
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2059)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2059)
 msgid ",Col_Header"
-msgstr "Alien Energy"
+msgstr "Collectibles"
 
 #. Key:	Col_RegionUnknown
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2085)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2085)
 msgid ",Col_RegionUnknown"
-msgstr "未知区域"
+msgstr "Unknown area"
 
 #. Key:	Col_SelectedDistance
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2130)
@@ -419,7 +419,7 @@ msgstr "Pick an alien-energy target to teleport to"
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(257)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(257)
 msgid ",Title"
-msgstr "远程工厂 · 终端面板"
+msgstr "Smart Factory · Terminal Panel"
 
 #. Key:	Status_Scanning
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(272)
@@ -701,7 +701,7 @@ msgstr "Unlocks the handheld Remote Factory and the High-Capacity Storage Unit. 
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryResearchTree.cpp(907)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryResearchTree.cpp(907)
 msgid ",Tree_Remote_Factory"
-msgstr "远程工厂"
+msgstr "Smart Factory"
 
 #. Key:	TreeDesc_Remote_Factory
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryResearchTree.cpp(908)
@@ -731,7 +731,7 @@ msgstr "Buy an Enhanced Power Shard with FICSIT coupons. One purchase = one shar
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(166)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(166)
 msgid ",Desc_UpgradePowerStorage"
-msgstr "A very large battery bank (1000 MWh). Stores the grid's surplus and releases it during a shortfall -- the factory-wide total shows up in the readout at the top of the Remote Factory."
+msgstr "A very large battery bank (1600 MWh). Stores the grid's surplus and releases it automatically during a shortfall. Once built, the factory-wide total shows at the top of the Smart Factory terminal panel."
 
 #. Key:	Desc_UpgradeStorage
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(178)
@@ -743,19 +743,19 @@ msgstr "An 8 x 12 = 96 slot container for stockpiling a whole production line's 
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1786)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1786)
 msgid ",Milestone_UpgradeStorage"
-msgstr "远程工厂 · Super Battery"
+msgstr "Smart Factory · Super Battery"
 
 #. Key:	MilestoneDesc_UpgradeStorage
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1787)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1787)
 msgid ",MilestoneDesc_UpgradeStorage"
-msgstr "Unlocks the Super Battery (1000 MWh, 100 MW charge rate). It links up with the terminal and shows up in the terminal's machine list once built."
+msgstr "Unlocks the Super Battery (1600 MWh, 400 MW charge/discharge). Connect it to the grid to store the surplus and release it automatically during a shortfall. Once built, the factory-wide total shows at the top of the Smart Factory terminal panel."
 
 #. Key:	Milestone_UpgradeAccelerator
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1809)
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1809)
 msgid ",Milestone_UpgradeAccelerator"
-msgstr "远程工厂 · Production Accelerator"
+msgstr "Smart Factory · Production Accelerator"
 
 #. Key:	MilestoneDesc_UpgradeAccelerator
 #. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1810)
@@ -906,4 +906,112 @@ msgstr "Cloud Fluid Download Station"
 #: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(2372)
 msgid ",Upgrade_Accelerator"
 msgstr "Production Accelerator"
+
+#. Key:	Col_BerylNut
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(401)
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(199)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(401)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(199)
+msgid ",Col_BerylNut"
+msgstr "Beryl Nut"
+
+#. Key:	Col_PaleBerry
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(406)
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(200)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(406)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(200)
+msgid ",Col_PaleBerry"
+msgstr "Paleberry"
+
+#. Key:	Col_BaconAgaric
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(411)
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(201)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(411)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(201)
+msgid ",Col_BaconAgaric"
+msgstr "Bacon Agaric"
+
+#. Key:	ColRow_Cave
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(131)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(131)
+msgid ",ColRow_Cave"
+msgstr "{0}   {1}   {2}   [Cave]"
+
+#. Key:	Cat_Modded
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(156)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(156)
+msgid ",Cat_Modded"
+msgstr "Modded Buildings"
+
+#. Key:	Cat_Shop
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(157)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(157)
+msgid ",Cat_Shop"
+msgstr "AWESOME Shop"
+
+#. Key:	Cat_CraftBench
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(158)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(158)
+msgid ",Cat_CraftBench"
+msgstr "Craft Bench"
+
+#. Key:	Cat_EquipWorkshop
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(159)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(159)
+msgid ",Cat_EquipWorkshop"
+msgstr "Equipment Workshop"
+
+#. Key:	Cat_LiquidContainer
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(160)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(160)
+msgid ",Cat_LiquidContainer"
+msgstr "Fluid Storage"
+
+#. Key:	Cat_SolidContainer
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(161)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(161)
+msgid ",Cat_SolidContainer"
+msgstr "Solid Storage"
+
+#. Key:	Cat_Vehicle
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(162)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(162)
+msgid ",Cat_Vehicle"
+msgstr "Vehicles"
+
+#. Key:	Cat_Portal
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(163)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(163)
+msgid ",Cat_Portal"
+msgstr "Portals"
+
+#. Key:	ColSuffix_Opened
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2524)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2524)
+msgid ",ColSuffix_Opened"
+msgstr "[Opened]"
+
+#. Key:	ColSuffix_Cave
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2529)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2529)
+msgid ",ColSuffix_Cave"
+msgstr "[Cave]"
+
+#. Key:	MachineGroupHeader
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1863)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1863)
+msgid ",MachineGroupHeader"
+msgstr "{0} ×{1} · nearest {2}m"
+
+#. Key:	MachineGroupMore
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1952)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1952)
+msgid ",MachineGroupMore"
+msgstr "      …{0} more of this machine (showing the nearest {1})"
+
+#. Key:	Status_TeleportNoSafeLanding
+#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2283)
+#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2283)
+msgid ",Status_TeleportNoSafeLanding"
+msgstr "Teleport cancelled: no safe landing at the target -- its area is not loaded yet (deep inside a cave, for example). Move closer first."
 
