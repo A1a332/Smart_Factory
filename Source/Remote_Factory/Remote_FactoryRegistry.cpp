@@ -149,7 +149,7 @@ URemote_FactoryDescriptor::URemote_FactoryDescriptor()
     mUseDisplayNameAndDescription = true;
     BuildableClass = ARemote_FactoryBuildable::StaticClass();
     HologramClass = ARemote_FactoryHologram::StaticClass();
-    DisplayName = WT_LOCTEXT("Building_Remote_Factory", "智能工厂");
+    DisplayName = WT_LOCTEXT("Building_Remote_Factory", "Smart Factory");
     Desc = WT_LOCTEXT("Desc_Remote_Factory",
         "A factory-wide console. Build it and press E: from your HUB you can see the output of "
         "every machine plus total factory generation and draw, open any machine's own panel "
@@ -243,7 +243,7 @@ static FSlateBrush WT_MakeCategoryIconBrush()
 
 URemote_FactoryBuildCategory::URemote_FactoryBuildCategory()
 {
-    mDisplayName = WT_LOCTEXT("Building_Remote_Factory", "智能工厂");
+    mDisplayName = WT_LOCTEXT("Building_Remote_Factory", "Smart Factory");
     // ★1.0.12：UFGCategory::mCategoryIcon 从未被设过 ⇒ 建造枪左栏「智能工厂」一直空白
     //   （1.0.11 用户截图实锤）。贴图复用里程碑同款 icon_handheld_terminal。
     mCategoryIcon = WT_MakeCategoryIconBrush();
@@ -251,7 +251,7 @@ URemote_FactoryBuildCategory::URemote_FactoryBuildCategory()
 
 URemote_FactoryBuildSubCategory::URemote_FactoryBuildSubCategory()
 {
-    mDisplayName = WT_LOCTEXT("Building_Remote_Factory", "智能工厂");
+    mDisplayName = WT_LOCTEXT("Building_Remote_Factory", "Smart Factory");
     mCategoryIcon = WT_MakeCategoryIconBrush();
 }
 
@@ -267,7 +267,7 @@ URemote_FactoryMilestone::URemote_FactoryMilestone()
     // （20×铁棒 + 30×螺丝 + 10×铜板），扫描仪不再出现在里程碑；tier 维持 2（T1 扫描仪即可做出，无卡点）。
     // （v0.2.2 的 tier-1 定案与「两个升级建筑拆其它 tier」的旧注释随 0.2.56 建筑移除一并过时。）
     mTechTier = 2;
-    mDisplayName = WT_LOCTEXT("Building_Remote_Factory", "智能工厂");
+    mDisplayName = WT_LOCTEXT("Building_Remote_Factory", "Smart Factory");
     mDescription = WT_LOCTEXT("Milestone_Remote_Factory",
         "Unlocks the handheld Smart Factory and the High-Capacity Storage Unit. Equip the "
         "terminal from your inventory to browse every machine, operate them remotely, pull their "

@@ -398,17 +398,17 @@ uint8 FWTCollectibles::ClassifyCollectibleItem(const UClass* ItemClass, FText& O
     // follow the Desc_<Name> asset convention (same family as the other descriptors).
     if (WTC_PathHas(ItemClass, TEXT("BerylNut")))
     {
-        OutLabel = NSLOCTEXT("Remote_Factory", "Col_BerylNut", "绿石果");
+        OutLabel = NSLOCTEXT("Remote_Factory", "Col_BerylNut", "Beryl Nut");
         return static_cast<uint8>(EWT_CollectibleKind::BerylNut);
     }
     if (WTC_PathHas(ItemClass, TEXT("PaleBerry")))
     {
-        OutLabel = NSLOCTEXT("Remote_Factory", "Col_PaleBerry", "古莓");
+        OutLabel = NSLOCTEXT("Remote_Factory", "Col_PaleBerry", "Paleberry");
         return static_cast<uint8>(EWT_CollectibleKind::PaleBerry);
     }
     if (WTC_PathHas(ItemClass, TEXT("BaconAgaric")))
     {
-        OutLabel = NSLOCTEXT("Remote_Factory", "Col_BaconAgaric", "培根伞菌");
+        OutLabel = NSLOCTEXT("Remote_Factory", "Col_BaconAgaric", "Bacon Agaric");
         return static_cast<uint8>(EWT_CollectibleKind::BaconAgaric);
     }
 

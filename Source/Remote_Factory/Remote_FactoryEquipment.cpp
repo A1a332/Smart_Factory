@@ -479,7 +479,7 @@ ARemote_FactoryEquipment::ARemote_FactoryEquipment()
 
 FText ARemote_FactoryEquipment::GetEquipmentDisplayName()
 {
-    return WT_LOCTEXT("Equip_PortableTerminal", "智能工厂");
+    return WT_LOCTEXT("Equip_PortableTerminal", "Smart Factory");
 }
 
 // ----------------------------------------------------------------------------

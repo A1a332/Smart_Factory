@@ -122,29 +122,27 @@ static FText WTBuildCollectibleRowText(const FWT_CollectibleEntry& C)
     const FString DistStr = (M < 1000.f)
         ? (FString::FromInt(FMath::RoundToInt(M)) + TEXT("m"))
         : FString::Printf(TEXT("%.1fkm"), M / 1000.f);
-    const FText StateText = C.bCollected ? WT_LOCTEXT("ColState_Collected", "已拾取")
-                                        : (C.RegionName.IsEmpty() ? WT_LOCTEXT("ColState_Uncollected", "未拾取")
+    const FText StateText = C.bCollected ? WT_LOCTEXT("ColState_Collected", "Collected")
+                                        : (C.RegionName.IsEmpty() ? WT_LOCTEXT("ColState_Uncollected", "Not collected")
                                                                  : C.RegionName);
     // ★0.2.136 溶洞条目在行尾追加 [溶洞] 标签。用另一条格式串而不是改 ColRow，避免动到既有
     // 译文（zh/en 两条本地化都带 {0}{1}{2} 的占位顺序）。
     return C.bCave
-        ? FText::Format(WT_LOCTEXT("ColRow_Cave", "{0}   {1}   {2}   [溶洞]"),
+        ? FText::Format(WT_LOCTEXT("ColRow_Cave", "{0}   {1}   {2}   [Cave]"),
                         C.DisplayName, FText::FromString(DistStr), StateText)
         : FText::Format(WT_LOCTEXT("ColRow", "{0}   {1}   {2}"),
                         C.DisplayName, FText::FromString(DistStr), StateText);
 }
 
-// Localization: the English string is the source language (see
-// Config/Localization/Remote_Factory_Gather.ini). Chinese lives in
-// Content/Localization/Remote_Factory/zh-Hans/Remote_Factory.po.
-// WT_LOCTEXT is defined in Remote_FactoryTypes.h.
+// Localization: the English string is the source language. Translations live in
+// Content/Localization/<culture>.json (see Remote_FactoryLoc.h).
 
 static FText CategoryLabel(int32 Index)
 {
     switch (static_cast<EWT_MachineCategory>(Index))
     {
         case EWT_MachineCategory::Producer:      return WT_LOCTEXT("Cat_Producer",      "Production");
-        case EWT_MachineCategory::Container:     return WT_LOCTEXT("Cat_Container",     "容器");
+        case EWT_MachineCategory::Container:     return WT_LOCTEXT("Cat_Container",     "Storage");
         case EWT_MachineCategory::Miner:         return WT_LOCTEXT("Cat_Miner",         "Extraction");
         case EWT_MachineCategory::Generator:     return WT_LOCTEXT("Cat_Generator",     "Power Generation");
         case EWT_MachineCategory::PowerSwitch:   return WT_LOCTEXT("Cat_PowerSwitch",   "Power Switch");
@@ -153,14 +151,14 @@ static FText CategoryLabel(int32 Index)
         case EWT_MachineCategory::SpaceElevator: return WT_LOCTEXT("Cat_SpaceElevator", "Space Elevator");
         case EWT_MachineCategory::MAM:           return WT_LOCTEXT("Cat_MAM",           "MAM");
         case EWT_MachineCategory::DropPod:       return WT_LOCTEXT("Cat_DropPod",       "Drop Pod");
-        case EWT_MachineCategory::Modded:        return WT_LOCTEXT("Cat_Modded",        "MOD建筑");
-        case EWT_MachineCategory::Shop:          return WT_LOCTEXT("Cat_Shop",          "AWESOME商店");
-        case EWT_MachineCategory::CraftBench:    return WT_LOCTEXT("Cat_CraftBench",    "制作台");
-        case EWT_MachineCategory::EquipWorkshop: return WT_LOCTEXT("Cat_EquipWorkshop", "装备工坊");
-        case EWT_MachineCategory::LiquidContainer: return WT_LOCTEXT("Cat_LiquidContainer", "液体容器");
-        case EWT_MachineCategory::SolidContainer:  return WT_LOCTEXT("Cat_SolidContainer",  "固体容器");
-        case EWT_MachineCategory::Vehicle:         return WT_LOCTEXT("Cat_Vehicle",         "运输工具");
-        case EWT_MachineCategory::Portal:          return WT_LOCTEXT("Cat_Portal",          "传送门");
+        case EWT_MachineCategory::Modded:        return WT_LOCTEXT("Cat_Modded",        "Modded Buildings");
+        case EWT_MachineCategory::Shop:          return WT_LOCTEXT("Cat_Shop",          "AWESOME Shop");
+        case EWT_MachineCategory::CraftBench:    return WT_LOCTEXT("Cat_CraftBench",    "Craft Bench");
+        case EWT_MachineCategory::EquipWorkshop: return WT_LOCTEXT("Cat_EquipWorkshop", "Equipment Workshop");
+        case EWT_MachineCategory::LiquidContainer: return WT_LOCTEXT("Cat_LiquidContainer", "Fluid Storage");
+        case EWT_MachineCategory::SolidContainer:  return WT_LOCTEXT("Cat_SolidContainer",  "Solid Storage");
+        case EWT_MachineCategory::Vehicle:         return WT_LOCTEXT("Cat_Vehicle",         "Vehicles");
+        case EWT_MachineCategory::Portal:          return WT_LOCTEXT("Cat_Portal",          "Portals");
         default:                                 return WT_LOCTEXT("Cat_Other",         "Other");
     }
 }
@@ -196,9 +194,9 @@ static FText CollectibleKindLabel(int32 Index)
         case EWT_CollectibleKind::MercerSphere:  return WT_LOCTEXT("Col_MercerSphere", "Mercer Sphere");
         case EWT_CollectibleKind::Somersloop:    return WT_LOCTEXT("Col_Somersloop",   "Somersloop");
         case EWT_CollectibleKind::DropPod:       return WT_LOCTEXT("Col_DropPod",      "Drop Pod");
-        case EWT_CollectibleKind::BerylNut:      return WT_LOCTEXT("Col_BerylNut",     "绿石果");
-        case EWT_CollectibleKind::PaleBerry:     return WT_LOCTEXT("Col_PaleBerry",    "古莓");
-        case EWT_CollectibleKind::BaconAgaric:   return WT_LOCTEXT("Col_BaconAgaric",  "培根伞菌");
+        case EWT_CollectibleKind::BerylNut:      return WT_LOCTEXT("Col_BerylNut",     "Beryl Nut");
+        case EWT_CollectibleKind::PaleBerry:     return WT_LOCTEXT("Col_PaleBerry",    "Paleberry");
+        case EWT_CollectibleKind::BaconAgaric:   return WT_LOCTEXT("Col_BaconAgaric",  "Bacon Agaric");
         default:                                 return WT_LOCTEXT("Col_Other",        "Other");
     }
 }
@@ -209,8 +207,8 @@ static FText CollectibleKindLabel(int32 Index)
  */
 static FText CollectiblePickedLabel(int32 Picked)
 {
-    return Picked == 1 ? WT_LOCTEXT("ColPick_Done", "【已拾取】")
-                       : WT_LOCTEXT("ColPick_Open", "【未拾取】");
+    return Picked == 1 ? WT_LOCTEXT("ColPick_Done", "[Collected]")
+                       : WT_LOCTEXT("ColPick_Open", "[Not collected]");
 }
 
 // ----------------------------------------------------------------------------
@@ -280,7 +278,7 @@ TSharedRef<SWidget> URemote_FactoryPanelWidget::RebuildWidget()
     // ---- title row -----------------------------------------------------------
     UHorizontalBox* TitleRow = WidgetTree->ConstructWidget<UHorizontalBox>();
 
-    TitleText = MakeText(WidgetTree, WT_LOCTEXT("Title", "智能工厂 · 终端面板"), 22, true, C_ACCENT);
+    TitleText = MakeText(WidgetTree, WT_LOCTEXT("Title", "Smart Factory · Terminal Panel"), 22, true, C_ACCENT);
     if (UHorizontalBoxSlot* S = TitleRow->AddChildToHorizontalBox(TitleText))
     {
         S->SetPadding(FMargin(2.f, 0.f, 12.f, 0.f));
@@ -1402,8 +1400,8 @@ void URemote_FactoryPanelWidget::RebuildCategoryList()
     // ★0.2.153p 用户定案：**「容器」顶层组并入「建筑」**（液体容器/固体容器作为建筑的两个子类，
     // 插在采矿设备与发电机之间）⇒ 顶层由 3 组变 2 组（建筑 / 收集品）。
     static const FText TopLabels[2] = {
-        WT_LOCTEXT("Top_Building", "建筑"),
-        WT_LOCTEXT("Top_Alien",    "收集品"),
+        WT_LOCTEXT("Top_Building", "Buildings"),
+        WT_LOCTEXT("Top_Alien",    "Collectibles"),
     };
     // Machine categories under the 建筑 group (DropPod is filed under 收集品 as a collectible,
     // per the user's taxonomy, so it is NOT listed here). From 0.2.84 the 收集品 group also holds
@@ -1621,7 +1619,7 @@ void URemote_FactoryPanelWidget::RebuildMachineList()
             const FVector RowLocation = C.Location;
             {
                 UTextBlock* TpLabel = nullptr;
-                UButton* TpBtn = MakeButton(WidgetTree, WT_LOCTEXT("Btn_RowTeleport", "传送"), C_ACCENT, &TpLabel);
+                UButton* TpBtn = MakeButton(WidgetTree, WT_LOCTEXT("Btn_RowTeleport", "Teleport"), C_ACCENT, &TpLabel);
                 TpBtn->TakeWidget();
                 if (TSharedPtr<SWidget> Cached = TpBtn->GetCachedWidget())
                 {
@@ -1776,7 +1774,7 @@ void URemote_FactoryPanelWidget::RebuildMachineList()
         // [传送] — every building, machine or not.
         {
             UTextBlock* TpLabel = nullptr;
-            UButton* TpBtn = MakeButton(WidgetTree, WT_LOCTEXT("Btn_RowTeleport", "传送"), C_ACCENT, &TpLabel);
+            UButton* TpBtn = MakeButton(WidgetTree, WT_LOCTEXT("Btn_RowTeleport", "Teleport"), C_ACCENT, &TpLabel);
             TpBtn->TakeWidget();
             if (TSharedPtr<SWidget> Cached = TpBtn->GetCachedWidget())
             {
@@ -1812,7 +1810,7 @@ void URemote_FactoryPanelWidget::RebuildMachineList()
         if (Entry.bHasInteractUI)
         {
             UTextBlock* OpenLabel = nullptr;
-            UButton* OpenBtn = MakeButton(WidgetTree, WT_LOCTEXT("Btn_RowOpen", "打开面板"), C_BTN, &OpenLabel);
+            UButton* OpenBtn = MakeButton(WidgetTree, WT_LOCTEXT("Btn_RowOpen", "Open"), C_BTN, &OpenLabel);
             OpenBtn->TakeWidget();
             if (TSharedPtr<SWidget> Cached = OpenBtn->GetCachedWidget())
             {
@@ -1860,7 +1858,7 @@ void URemote_FactoryPanelWidget::RebuildMachineList()
             ? WT_LOCTEXT("FoldOpen", "▼")
             : WT_LOCTEXT("FoldClosed", "▶");
         const FText HeaderLabel = FText::Format(
-            WT_LOCTEXT("MachineGroupHeader", "{0} ×{1} · 最近 {2}m"),
+            WT_LOCTEXT("MachineGroupHeader", "{0} ×{1} · nearest {2}m"),
             G.Name,
             FText::AsNumber(G.Members.Num()),
             FText::AsNumber(FMath::RoundToInt(G.NearestM)));
@@ -1949,7 +1947,7 @@ void URemote_FactoryPanelWidget::RebuildMachineList()
         {
             UTextBlock* More = WidgetTree->ConstructWidget<UTextBlock>();
             More->SetText(FText::Format(
-                WT_LOCTEXT("MachineGroupMore", "      …另有 {0} 台同型机器（已显示最近的 {1} 台）"),
+                WT_LOCTEXT("MachineGroupMore", "      …{0} more of this machine (showing the nearest {1})"),
                 FText::AsNumber(G.Members.Num() - Shown),
                 FText::AsNumber(Shown)));
             if (UScrollBoxSlot* S = Cast<UScrollBoxSlot>(MachineListBox->AddChild(More)))
@@ -2269,11 +2267,9 @@ void URemote_FactoryPanelWidget::HandleTeleportResult(AActor* Target, bool bSucc
     {
         if (bSuccess)
         {
-            // ★0.2.137 源串一律用中文：本 mod 的中文环境显示的是**代码字面量**（zh po 运行期并不可靠，
-            // 0.2.135 的英文源串在中文客户端直接漏英），英文走 en archive 的 Translation 兜底。
-            StatusText->SetText(FText::Format(WT_LOCTEXT("Status_TeleportedTo", "已传送到 {0}"),
+            StatusText->SetText(FText::Format(WT_LOCTEXT("Status_TeleportedTo", "Teleported to {0}"),
                             FText::FromString(Target ? Target->GetName()
-                                                     : WT_LOCTEXT("Target_Generic", "目标").ToString())));
+                                                     : WT_LOCTEXT("Target_Generic", "target").ToString())));
         }
         else if (Reason == WTTeleportFail::NoSafeLanding)
         {
@@ -2281,11 +2277,11 @@ void URemote_FactoryPanelWidget::HandleTeleportResult(AActor* Target, bool bSucc
             // 单元格就是这种情况。以前会把玩家丢过去直接掉出地形（用户实测：外星类目标在溶洞里
             // 传送会把角色卡出地形外），现在服务端直接取消，这里要说清「不是目标没了，是那边没地面」。
             StatusText->SetText(WT_LOCTEXT("Status_TeleportNoSafeLanding",
-                "传送已取消：目标附近没有可站立的地面（该区域尚未加载，例如溶洞深处），请先靠近后再传送"));
+                "Teleport cancelled: no safe landing at the target -- its area is not loaded yet (deep inside a cave, for example). Move closer first."));
         }
         else
         {
-            StatusText->SetText(WT_LOCTEXT("Status_TeleportFailed", "传送失败：目标已失效"));
+            StatusText->SetText(WT_LOCTEXT("Status_TeleportFailed", "Teleport failed: the target is gone"));
         }
     }
 
@@ -2479,7 +2475,7 @@ void URemote_FactoryPanelWidget::RebuildCollectibleList()
     // ---- per-kind tally ----
     if (CollectibleHeaderText)
     {
-        FString Tally = WT_LOCTEXT("Col_Header", "收集品").ToString();
+        FString Tally = WT_LOCTEXT("Col_Header", "Collectibles").ToString();
         for (int32 i = 0; i < static_cast<int32>(EWT_CollectibleKind::Count); ++i)
         {
             // ★0.2.69: whole-map total from collectibles.json when available, else wiki (live scan under-counts).
@@ -2505,7 +2501,7 @@ void URemote_FactoryPanelWidget::RebuildCollectibleList()
         {
             LastRegion = Region;
             const FText HeaderText = Region.IsEmpty()
-                ? WT_LOCTEXT("Col_RegionUnknown", "未知区域")
+                ? WT_LOCTEXT("Col_RegionUnknown", "Unknown area")
                 : FText::FromString(FString::Printf(TEXT("—— %s ——"), *Region));
             if (UTextBlock* Header = MakeText(WidgetTree, HeaderText, 13, true, C_ACCENT))
             {
@@ -2517,18 +2513,21 @@ void URemote_FactoryPanelWidget::RebuildCollectibleList()
         }
 
         // "空投舱【已开启】   X 12345  Y -6789  Z 123  1.2km"
-        const TCHAR* StateSuffix = TEXT("");
+        FString StateSuffix;
         if (Entry.bCollected)
         {
             StateSuffix = (static_cast<EWT_CollectibleKind>(Entry.Kind) == EWT_CollectibleKind::DropPod)
-                ? TEXT("【已开启】") : TEXT("【已拾取】");
+                ? WT_LOCTEXT("ColSuffix_Opened", "[Opened]").ToString()
+                : WT_LOCTEXT("ColPick_Done", "[Collected]").ToString();
         }
         // ★0.2.136 溶洞后缀（与上面的【已拾取】同为行内状态标记，保持同一套硬编码风格）。
-        const TCHAR* CaveSuffix = Entry.bCave ? TEXT("   【溶洞】") : TEXT("");
+        const FString CaveSuffix = Entry.bCave
+            ? TEXT("   ") + WT_LOCTEXT("ColSuffix_Cave", "[Cave]").ToString()
+            : FString();
         const FString Row = FString::Printf(TEXT("%s%s   X %.0f  Y %.0f  Z %.0f   %.1fkm%s"),
-                                            *Entry.DisplayName.ToString(), StateSuffix,
+                                            *Entry.DisplayName.ToString(), *StateSuffix,
                                             Entry.Location.X, Entry.Location.Y, Entry.Location.Z,
-                                            Entry.DistanceMeters / 1000.f, CaveSuffix);
+                                            Entry.DistanceMeters / 1000.f, *CaveSuffix);
 
         FWT_ButtonInfo Info;
         Info.Kind = static_cast<uint8>(EWT_ButtonKind::CollectibleRow);

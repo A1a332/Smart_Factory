@@ -165,8 +165,9 @@ UWTUpgradePowerStorageDescriptor::UWTUpgradePowerStorageDescriptor()
     DisplayName = AWTUpgradePowerStorage::GetDisplayName();
     // ★1.0.12 中文化 + 数字纠偏（旧文案 1000 MWh 是 0.2.48 提速前的旧数值，实际 1600/400）。
     Desc = WT_LOCTEXT("Desc_UpgradePowerStorage",
-        "一座超大容量电池组（1600 MWh）。存储电网盈余、在缺电时自动释放；"
-        "建成后整座工厂的蓄电总量会显示在智能工厂终端面板顶部。");
+        "A very large battery bank (1600 MWh). Stores the grid's surplus and releases it automatically "
+        "during a shortfall. Once built, the factory-wide total shows at the top of the Smart Factory "
+        "terminal panel.");
     InitCommon();
 }
 
@@ -1824,10 +1825,11 @@ UWTUpgradeStorageMilestone::UWTUpgradeStorageMilestone()
     // ★1.0.12 文案中文化 + 数字纠偏：旧文案是英文且写的是 1000 MWh/100 MW（0.2.48 提速前的
     //   旧数值），实际 0.2.48 定案为 1600 MWh / 400 MW。
     mTechTier = 3;
-    mDisplayName = WT_LOCTEXT("Milestone_UpgradeStorage", "智能工厂 · 超级蓄电池");
+    mDisplayName = WT_LOCTEXT("Milestone_UpgradeStorage", "Smart Factory · Super Battery");
     mDescription = WT_LOCTEXT("MilestoneDesc_UpgradeStorage",
-        "解锁超级蓄电池（1600 MWh，充/放 400 MW）。接入电网即可存储全网盈余、在缺电时自动释放；"
-        "建成后整座工厂的蓄电总量会显示在智能工厂终端面板顶部。");
+        "Unlocks the Super Battery (1600 MWh, 400 MW charge/discharge). Connect it to the grid to store "
+        "the surplus and release it automatically during a shortfall. Once built, the factory-wide "
+        "total shows at the top of the Smart Factory terminal panel.");
 }
 
 FString UWTUpgradeStorageMilestone::InstallCostAndUnlock()
@@ -1849,7 +1851,7 @@ UWTUpgradeAcceleratorMilestone::UWTUpgradeAcceleratorMilestone()
     // Tier 5 ("Oil Processing"). Tiers 5 and 6 open on the same Space Elevator phase, which is why
     // heavy modular frame is acceptable here.
     mTechTier = 5;
-    mDisplayName = WT_LOCTEXT("Milestone_UpgradeAccelerator", "智能工厂 · Production Accelerator");
+    mDisplayName = WT_LOCTEXT("Milestone_UpgradeAccelerator", "Smart Factory · Production Accelerator");
     mDescription = WT_LOCTEXT("MilestoneDesc_UpgradeAccelerator",
         "Unlocks the Production Accelerator (up to 2.5x output, no power shards needed). It links up "
         "with the terminal and shows up in the terminal's machine list once built.");

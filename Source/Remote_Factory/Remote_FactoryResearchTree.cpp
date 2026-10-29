@@ -858,8 +858,9 @@ void UWTResearchTreeBase::ConfigureTree(EWTUpgradeTrack Track, const FText& Disp
 {
     mDisplayName          = DisplayName;
     mPreUnlockDisplayName = DisplayName;
-    mPreUnlockDescription = FText::FromString(
-        TEXT("通过 MAM 逐级解锁智能工厂的升级建筑。每级成本递增，对应建筑按等级自动强化。"));
+    mPreUnlockDescription = WT_LOCTEXT("TreeDesc_Remote_Factory",
+        "Research the Smart Factory's upgrade buildings level by level in the MAM. "
+        "Each level costs more than the last; the matching building scales automatically.");
     mPostUnlockDescription = mPreUnlockDescription;
 
     TArray<TObjectPtr<UFGResearchTreeNode>> Nodes;
@@ -907,7 +908,7 @@ void WT_BuildResearchTrees()
         return;
     }
     CDO->ConfigureMergedTree(
-        WT_LOCTEXT("Tree_Remote_Factory", "智能工厂"),
+        WT_LOCTEXT("Tree_Remote_Factory", "Smart Factory"),
         WT_LOCTEXT("TreeDesc_Remote_Factory",
             "Research the Smart Factory's upgrade buildings level by level in the MAM. "
             "Each level costs more than the last; the matching building scales automatically."));
