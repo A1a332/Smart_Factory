@@ -1,0 +1,612 @@
+{
+	"Cultures": [
+		"zh-Hans",
+		"zh"
+	],
+	"Entries": {
+		"Arrow_Down": {
+			"Source": "▼",
+			"Translation": "▼"
+		},
+		"Arrow_Right": {
+			"Source": "▶",
+			"Translation": "▶"
+		},
+		"Btn_Close": {
+			"Source": "Close",
+			"Translation": "关闭"
+		},
+		"Btn_NoAutoLimit": {
+			"Source": "Never auto-limit",
+			"Translation": "不自动限电"
+		},
+		"Btn_OpenMachinePanel": {
+			"Source": "Open machine panel",
+			"Translation": "打开机器面板"
+		},
+		"Btn_PriorityDown": {
+			"Source": "Priority -",
+			"Translation": "优先级 -"
+		},
+		"Btn_PriorityUp": {
+			"Source": "Priority +",
+			"Translation": "优先级 +"
+		},
+		"Btn_PullOutput": {
+			"Source": "Take output",
+			"Translation": "取出产物"
+		},
+		"Btn_Refresh": {
+			"Source": "Refresh",
+			"Translation": "刷新"
+		},
+		"Btn_RowOpen": {
+			"Source": "Open",
+			"Translation": "打开"
+		},
+		"Btn_RowTeleport": {
+			"Source": "Teleport",
+			"Translation": "传送"
+		},
+		"Btn_SwitchOff": {
+			"Source": "Turn off",
+			"Translation": "断开"
+		},
+		"Btn_SwitchOn": {
+			"Source": "Turn on",
+			"Translation": "合闸"
+		},
+		"Btn_TeleportToMachine": {
+			"Source": "Teleport to this machine",
+			"Translation": "传送到此机器"
+		},
+		"Building_Remote_Factory": {
+			"Source": "Smart Factory",
+			"Translation": "智能工厂"
+		},
+		"Cat_AwesomeSink": {
+			"Source": "Resource Sink",
+			"Translation": "资源回收站"
+		},
+		"Cat_Container": {
+			"Source": "Storage",
+			"Translation": "容器"
+		},
+		"Cat_CraftBench": {
+			"Source": "Craft Bench",
+			"Translation": "制作台"
+		},
+		"Cat_DropPod": {
+			"Source": "Drop Pod",
+			"Translation": "空投舱"
+		},
+		"Cat_EquipWorkshop": {
+			"Source": "Equipment Workshop",
+			"Translation": "装备工坊"
+		},
+		"Cat_Generator": {
+			"Source": "Power Generation",
+			"Translation": "发电机"
+		},
+		"Cat_Hub": {
+			"Source": "HUB",
+			"Translation": "枢纽"
+		},
+		"Cat_LiquidContainer": {
+			"Source": "Fluid Storage",
+			"Translation": "液体容器"
+		},
+		"Cat_MAM": {
+			"Source": "MAM",
+			"Translation": "分子分析机"
+		},
+		"Cat_Miner": {
+			"Source": "Extraction",
+			"Translation": "采矿设备"
+		},
+		"Cat_Modded": {
+			"Source": "Modded Buildings",
+			"Translation": "MOD建筑"
+		},
+		"Cat_Other": {
+			"Source": "Other",
+			"Translation": "其他"
+		},
+		"Cat_Portal": {
+			"Source": "Portals",
+			"Translation": "传送门"
+		},
+		"Cat_PowerSwitch": {
+			"Source": "Power Switch",
+			"Translation": "电源开关"
+		},
+		"Cat_Producer": {
+			"Source": "Production",
+			"Translation": "生产设备"
+		},
+		"Cat_Shop": {
+			"Source": "AWESOME Shop",
+			"Translation": "AWESOME商店"
+		},
+		"Cat_SolidContainer": {
+			"Source": "Solid Storage",
+			"Translation": "固体容器"
+		},
+		"Cat_SpaceElevator": {
+			"Source": "Space Elevator",
+			"Translation": "太空电梯"
+		},
+		"Cat_Vehicle": {
+			"Source": "Vehicles",
+			"Translation": "运输工具"
+		},
+		"ColPick_Done": {
+			"Source": "[Collected]",
+			"Translation": "【已拾取】"
+		},
+		"ColPick_Open": {
+			"Source": "[Not collected]",
+			"Translation": "【未拾取】"
+		},
+		"ColRow": {
+			"Source": "{0}   {1}   {2}",
+			"Translation": "{0}   {1}   {2}"
+		},
+		"ColRow_Cave": {
+			"Source": "{0}   {1}   {2}   [Cave]",
+			"Translation": "{0}   {1}   {2}   [溶洞]"
+		},
+		"ColState_Collected": {
+			"Source": "Collected",
+			"Translation": "已拾取"
+		},
+		"ColState_Uncollected": {
+			"Source": "Not collected",
+			"Translation": "未拾取"
+		},
+		"ColSuffix_Cave": {
+			"Source": "[Cave]",
+			"Translation": "【溶洞】"
+		},
+		"ColSuffix_Opened": {
+			"Source": "[Opened]",
+			"Translation": "【已开启】"
+		},
+		"Col_BaconAgaric": {
+			"Source": "Bacon Agaric",
+			"Translation": "培根伞菌"
+		},
+		"Col_BerylNut": {
+			"Source": "Beryl Nut",
+			"Translation": "绿石果"
+		},
+		"Col_DropPod": {
+			"Source": "Drop Pod",
+			"Translation": "空投舱"
+		},
+		"Col_Header": {
+			"Source": "Collectibles",
+			"Translation": "收集品"
+		},
+		"Col_MercerSphere": {
+			"Source": "Mercer Sphere",
+			"Translation": "梅瑟尔球"
+		},
+		"Col_Other": {
+			"Source": "Other",
+			"Translation": "其他"
+		},
+		"Col_PaleBerry": {
+			"Source": "Paleberry",
+			"Translation": "古莓"
+		},
+		"Col_PickToTeleport": {
+			"Source": "Pick an alien-energy target to teleport to",
+			"Translation": "选择一处外星能源以传送"
+		},
+		"Col_RegionUnknown": {
+			"Source": "Unknown area",
+			"Translation": "未知区域"
+		},
+		"Col_SelectedDistance": {
+			"Source": "Selected: {0}   {1} km away",
+			"Translation": "已选：{0}   距离 {1} km"
+		},
+		"Col_SlugBlue": {
+			"Source": "Power Slug (Blue)",
+			"Translation": "能量蛞蝓（蓝）"
+		},
+		"Col_SlugPurple": {
+			"Source": "Power Slug (Purple)",
+			"Translation": "能量蛞蝓（紫）"
+		},
+		"Col_SlugYellow": {
+			"Source": "Power Slug (Yellow)",
+			"Translation": "能量蛞蝓（黄）"
+		},
+		"Col_Somersloop": {
+			"Source": "Somersloop",
+			"Translation": "索莫晶体"
+		},
+		"Desc_Remote_Factory": {
+			"Source": "A factory-wide console. Build it and press E: from your HUB you can see the output of every machine plus total factory generation and draw, open any machine's own panel remotely, and pull its output straight out.",
+			"Translation": "全厂控制台。建造后按 E 打开：在枢纽里就能看到全部机器的产出与全厂发电/耗电，远程打开任意机器的原生面板，并直接取出产物。"
+		},
+		"Desc_UpgradeAccelerator": {
+			"Source": "Needs no power shards: once powered it applies a long-lasting production multiplier to itself. Capped at 2.5x -- beyond that the power draw outgrows the output and you are better off building another machine.",
+			"Translation": "不需要能量碎片，通电后对自身施加一段长期产能倍率。上限 2.5 倍 —— 再高的话耗电增长会快过产出增长，不如直接多建一台。"
+		},
+		"Desc_UpgradeCloudDownloader": {
+			"Source": "The other half of the cloud storage system: pulls items back OUT of the central pool into its own buffer, one stack at a time. Open it like any storage container and grab what you need.",
+			"Translation": "云端存储的另一半：把云端池里的物品拉回本地缓冲（每次一组），像普通仓库一样打开取用。与上传站配套使用。"
+		},
+		"Desc_UpgradeCloudFluidDownloader": {
+			"Source": "Press E to pick which fluid the cloud should send back out, then attach a pipe: the station feeds the selected fluid into the network as long as the cloud holds stock.",
+			"Translation": "按 E 选择云端要送回的流体，再接上管道：只要云端有存货，站点就会持续把选中的流体注回管网。"
+		},
+		"Desc_UpgradeCloudFluidUploader": {
+			"Source": "Attach a pipe and every cubic meter that arrives is uploaded into the cloud pool as its own fluid entry -- liquids and gases are accounted separately from solid items.",
+			"Translation": "接上管道，流进来的每一方流体都会按物品类记入云端池 —— 液体与气体与固体分开记账、全厂共享。"
+		},
+		"Desc_UpgradePowerStorage": {
+			"Source": "A very large battery bank (1600 MWh). Stores the grid's surplus and releases it automatically during a shortfall. Once built, the factory-wide total shows at the top of the Smart Factory terminal panel.",
+			"Translation": "一座超大容量电池组（1600 MWh）。存储电网盈余、在缺电时自动释放；建成后整座工厂的蓄电总量会显示在智能工厂终端面板顶部。"
+		},
+		"Desc_UpgradeStorage": {
+			"Source": "An 8 x 12 = 96 slot container for stockpiling a whole production line's intermediates. The Smart Factory picks it up in its scan, so you can check the contents from there.",
+			"Translation": "通往云端存储的入口：把物品上传进位面存储站的聚合云端池，全厂共享。可被智能工厂扫到，在终端里直接查看存量。"
+		},
+		"Detail_DistanceAndStatus": {
+			"Source": "{0}m away · {1}",
+			"Translation": "距离 {0} 米 · {1}"
+		},
+		"Detail_NoMachine": {
+			"Source": "No machine selected",
+			"Translation": "未选择机器"
+		},
+		"Detail_NoMachineSelected": {
+			"Source": "No machine selected",
+			"Translation": "未选择机器"
+		},
+		"EquipDesc_PortableTerminal": {
+			"Source": "A handheld Smart Factory. Craft it at a workbench and put it in an arm slot -- drawing it opens the factory console instantly, so you can check output, open a machine's own panel and pull items while standing at the miner instead of walking back to the HUB.",
+			"Translation": "手持版智能工厂。在工作台制作后放进手臂槽，掏出来的瞬间就会打开全厂控制台 —— 不用回枢纽，站在矿机旁边就能看产出、开机器面板、取产物。"
+		},
+		"Equip_PortableTerminal": {
+			"Source": "Smart Factory",
+			"Translation": "智能工厂"
+		},
+		"FluidPanel_CurrentFmt": {
+			"Source": "Current: {0}",
+			"Translation": "当前：{0}"
+		},
+		"FluidPanel_NoFluids": {
+			"Source": "The cloud holds no fluids yet. Connect a Cloud Fluid Upload Station to a pipe.",
+			"Translation": "云端暂无流体。先把云端液态上传站接到管道上，流体就会开始进云。"
+		},
+		"FluidPanel_NoTarget": {
+			"Source": "Open this panel on a Cloud Fluid Download Station.",
+			"Translation": "请在云端液态下载站上打开本面板。"
+		},
+		"FluidPanel_None": {
+			"Source": "<none>",
+			"Translation": "<未选择>"
+		},
+		"FluidPanel_RowFmt": {
+			"Source": "{0} · {1}",
+			"Translation": "{0} · {1}"
+		},
+		"FluidPanel_Title": {
+			"Source": "Cloud Fluid Download Station · Pick a Fluid",
+			"Translation": "云端液态下载站 · 选择流体"
+		},
+		"FoldClosed": {
+			"Source": "▶",
+			"Translation": "▶"
+		},
+		"FoldOpen": {
+			"Source": "▼",
+			"Translation": "▼"
+		},
+		"Header_PrioritySwitch": {
+			"Source": "Power Switch · Priority Switch",
+			"Translation": "电源开关 · 优先级开关"
+		},
+		"Header_Switch": {
+			"Source": "Power Switch",
+			"Translation": "电源开关"
+		},
+		"Item_Unknown": {
+			"Source": "Unknown item",
+			"Translation": "未知物品"
+		},
+		"MachineGroupHeader": {
+			"Source": "{0} ×{1} · nearest {2}m",
+			"Translation": "{0} ×{1} · 最近 {2}m"
+		},
+		"MachineGroupMore": {
+			"Source": "      …{0} more of this machine (showing the nearest {1})",
+			"Translation": "      …另有 {0} 台同型机器（已显示最近的 {1} 台）"
+		},
+		"MachineRow": {
+			"Source": "{0}   {1}m   {2}",
+			"Translation": "{0}   {1}m   {2}"
+		},
+		"MilestoneDesc_UpgradeAccelerator": {
+			"Source": "Unlocks the Production Accelerator (up to 2.5x output, no power shards needed). It links up with the terminal and shows up in the terminal's machine list once built.",
+			"Translation": "解锁产能加速器（最高 2.5 倍产出，不需要能量碎片）。它与终端联动，建好后会出现在终端的机器列表里。"
+		},
+		"MilestoneDesc_UpgradeStorage": {
+			"Source": "Unlocks the Super Battery (1600 MWh, 400 MW charge/discharge). Connect it to the grid to store the surplus and release it automatically during a shortfall. Once built, the factory-wide total shows at the top of the Smart Factory terminal panel.",
+			"Translation": "解锁超级蓄电池（1600 MWh，充/放 400 MW）。接入电网即可存储全网盈余、在缺电时自动释放；建成后整座工厂的蓄电总量会显示在智能工厂终端面板顶部。"
+		},
+		"Milestone_Remote_Factory": {
+			"Source": "Unlocks the handheld Smart Factory and the High-Capacity Storage Unit. Equip the terminal from your inventory to browse every machine, operate them remotely, pull their output and teleport -- from anywhere in the world.",
+			"Translation": "解锁智能工厂。把它建在枢纽旁边，即可在枢纽内查看全厂机器、远程操控并取出产物。"
+		},
+		"Milestone_UpgradeAccelerator": {
+			"Source": "Smart Factory · Production Accelerator",
+			"Translation": "智能工厂 · 产能加速器"
+		},
+		"Milestone_UpgradeStorage": {
+			"Source": "Smart Factory · Super Battery",
+			"Translation": "智能工厂 · 超级蓄电池"
+		},
+		"Msg_NoAutoLimit": {
+			"Source": "Set to never auto-limit",
+			"Translation": "已设为不自动限电"
+		},
+		"Msg_NoPrioritySupport": {
+			"Source": "This switch has no power-limit priority.",
+			"Translation": "该开关没有限电优先级"
+		},
+		"Msg_NotASwitch": {
+			"Source": "Target is not a power switch.",
+			"Translation": "目标不是电源开关"
+		},
+		"Msg_PrioritySet": {
+			"Source": "Priority set to {0}",
+			"Translation": "优先级已设为 {0}"
+		},
+		"Msg_SwitchNotWired": {
+			"Source": "The switch is not wired on both ends, so this has no effect.",
+			"Translation": "开关两端未接线，操作无效"
+		},
+		"Msg_SwitchedOff": {
+			"Source": "Switched off",
+			"Translation": "已断开"
+		},
+		"Msg_SwitchedOn": {
+			"Source": "Switched on",
+			"Translation": "已合闸"
+		},
+		"Output_None": {
+			"Source": "(no output)",
+			"Translation": "（无产物）"
+		},
+		"Player_Unknown": {
+			"Source": "Unknown player",
+			"Translation": "未知玩家"
+		},
+		"Power_Reading": {
+			"Source": "Power  reading…",
+			"Translation": "电力  读取中…"
+		},
+		"Power_Readout": {
+			"Source": "Gen {0} / {1} MW      Use {2} / {3} MW\nStored {4} / {5} MWh      Grids {6}",
+			"Translation": "发电 {0} / {1} MW      耗电 {2} / {3} MW\n储能 {4} / {5} MWh      电网 {6} 路"
+		},
+		"Reason_NoPlayerController": {
+			"Source": "Could not find the player controller.",
+			"Translation": "找不到玩家控制器"
+		},
+		"Reason_ViewerReadOnly": {
+			"Source": "Only the console host can make changes (you are in view-only mode).",
+			"Translation": "只有控制台主控玩家可以操作（当前为观看模式）"
+		},
+		"ResearchDisplayNameFmt": {
+			"Source": "{0} · Lv{1}",
+			"Translation": "{0} · Lv{1}"
+		},
+		"ResearchNodeNameFmt": {
+			"Source": "{0} {1}",
+			"Translation": "{0} {1}"
+		},
+		"RewardDescBattery": {
+			"Source": "Super battery: each level raises the battery's stored energy and its charge rate by 25%. Batteries link up into one grid-wide buffer.",
+			"Translation": "超级蓄电池：每级使蓄电量与充电功率提升 25%。多台电池自动并入同一全网缓冲。"
+		},
+		"RewardDescCapacity": {
+			"Source": "Cloud capacity: the central pool now holds {0} stacks per item type (this level +2). The pool is shared by all four stations -- the solid upload station, the fluid upload station, the solid download station and the fluid download station.",
+			"Translation": "云端容量：中央云端池每类物品可存 {0} 组（本级 +2）。云端池由四类站共享 —— 云端储存上传站（固体）、云端液态上传站、云端存储下载站（固体）、云端液态下载站。"
+		},
+		"RewardDescFinalBoost": {
+			"Source": "Final reinforcement (shard route): all three tracks advance together. Each level additionally consumes Enhanced Power Shards and grants a 1.5x effect.",
+			"Translation": "最终强化（碎片路线）：三条轨同时推进。每级额外消耗强化能量碎片，换来 1.5 倍效果。"
+		},
+		"RewardDescFinalPlain": {
+			"Source": "Final reinforcement (standard route): all three tracks advance together along the original curve. Consumes no power shards.",
+			"Translation": "最终强化（常规路线）：三条轨同时推进，走原曲线、不消耗强化能量碎片。"
+		},
+		"RewardDescShard": {
+			"Source": "Enhanced power shard: each stage raises every machine's shard-slot potential ceiling (250% -> 300% -> 350% -> 400%) together with the per-shard increment. Power draw still follows the vanilla curve.",
+			"Translation": "强化能量碎片：每一阶段同时抬升全部机器的碎片插槽潜能上限（250% → 300% → 350% → 400%），并提高单块碎片的潜能增量。耗电仍按原版曲线。"
+		},
+		"Route_FinalBoost": {
+			"Source": "Final Reinforcement · Shard",
+			"Translation": "最终强化 · 碎片"
+		},
+		"Route_FinalPlain": {
+			"Source": "Final Reinforcement · Standard",
+			"Translation": "最终强化 · 常规"
+		},
+		"Shard_Desc": {
+			"Source": "A refined shard for the vanilla shard slots. It overclocks exactly like a vanilla shard, but packs more potential per slot -- and the machines' potential ceiling rises with your MAM research (up to 400%: 3 shards = 1 + 3 x 1.0). Power draw follows the vanilla curve, so high overclocks burn coal fast.",
+			"Translation": "供原版能量碎片插槽使用的精炼碎片。插入后按原版逻辑超频，但单块潜能更高，且机器潜能上限随 MAM 产能研究提升（满级 3 块 = 400%）。电力消耗走原版曲线，高倍率时电费涨得很快。可投入资源回收站回收，也可在 AWESOME 商店用代价券购买。"
+		},
+		"Shard_Name": {
+			"Source": "Enhanced Power Shard",
+			"Translation": "强化能量碎片"
+		},
+		"Shared_OtherPlayer": {
+			"Source": "another player",
+			"Translation": "其他玩家"
+		},
+		"Shared_ViewerMode": {
+			"Source": "Sharing · host: {0} (view-only, cannot operate)",
+			"Translation": "共享中 · 主控：{0}（观看模式，无法操作）"
+		},
+		"Shared_YouAreOwner": {
+			"Source": "Sharing · you are the host ({0} others watching)",
+			"Translation": "共享中 · 你是主控（另 {0} 人在看）"
+		},
+		"ShopPowerShard_Desc": {
+			"Source": "Buy an Enhanced Power Shard with FICSIT coupons. One purchase = one shard; purchase as many as you need.",
+			"Translation": "用 FICSIT 代价券购买强化能量碎片。每次购买 1 块，可重复购买。"
+		},
+		"ShopPowerShard_Name": {
+			"Source": "Enhanced Power Shard",
+			"Translation": "强化能量碎片"
+		},
+		"Status_MachineCount": {
+			"Source": "{0} machines",
+			"Translation": "{0} 台机器"
+		},
+		"Status_MachineCountRendered": {
+			"Source": "{0} machines (list draws nearest {1})",
+			"Translation": "{0} 台机器（列表只绘制最近的 {1} 台）"
+		},
+		"Status_MachineCountTruncated": {
+			"Source": "{0} machines listed (factory exceeds list cap - nearest shown)",
+			"Translation": "{0} 台机器（已达上限，结果被截断）"
+		},
+		"Status_NothingToPull": {
+			"Source": "There is no output to take",
+			"Translation": "没有可取出的产物"
+		},
+		"Status_PulledItems": {
+			"Source": "Took {0} items",
+			"Translation": "已取出 {0} 个物品"
+		},
+		"Status_Scanning": {
+			"Source": "Scanning…",
+			"Translation": "正在扫描…"
+		},
+		"Status_TeleportFailed": {
+			"Source": "Teleport failed: the target is gone",
+			"Translation": "传送失败：目标已失效"
+		},
+		"Status_TeleportNoSafeLanding": {
+			"Source": "Teleport cancelled: no safe landing at the target -- its area is not loaded yet (deep inside a cave, for example). Move closer first.",
+			"Translation": "传送已取消：目标附近没有可站立的地面（该区域尚未加载，例如溶洞深处），请先靠近后再传送"
+		},
+		"Status_TeleportedTo": {
+			"Source": "Teleported to {0}",
+			"Translation": "已传送到 {0}"
+		},
+		"Sub2_Plain": {
+			"Source": "        {0}",
+			"Translation": "        {0}"
+		},
+		"Sub2_WithCount": {
+			"Source": "        {0}  ({1})",
+			"Translation": "        {0}  ({1})"
+		},
+		"Sub_Plain": {
+			"Source": "    {0}",
+			"Translation": "    {0}"
+		},
+		"Sub_WithCount": {
+			"Source": "    {0}  ({1})",
+			"Translation": "    {0}  ({1})"
+		},
+		"SwitchState_NoLimiter": {
+			"Source": "Now: {0}　never auto-limits",
+			"Translation": "当前：{0}　不自动限电"
+		},
+		"SwitchState_NotWired": {
+			"Source": "Not wired — both ends of the switch must be connected to a power grid.",
+			"Translation": "未接线 —— 开关两端都要连到电网才能生效"
+		},
+		"SwitchState_Plain": {
+			"Source": "Now: {0}",
+			"Translation": "当前：{0}"
+		},
+		"SwitchState_WithPriority": {
+			"Source": "Now: {0}　limit priority {1}",
+			"Translation": "当前：{0}　限电优先级 {1}"
+		},
+		"Switch_Off": {
+			"Source": "Off",
+			"Translation": "断开"
+		},
+		"Switch_On": {
+			"Source": "On",
+			"Translation": "合闸"
+		},
+		"Target_Generic": {
+			"Source": "target",
+			"Translation": "目标"
+		},
+		"Title": {
+			"Source": "Smart Factory · Terminal Panel",
+			"Translation": "智能工厂 · 终端面板"
+		},
+		"TopLabel": {
+			"Source": "{0}  {1}  ({2})",
+			"Translation": "{0}  {1}  ({2})"
+		},
+		"Top_Alien": {
+			"Source": "Collectibles",
+			"Translation": "收集品"
+		},
+		"Top_Building": {
+			"Source": "Buildings",
+			"Translation": "建筑"
+		},
+		"Track_PowerShard": {
+			"Source": "Enhanced Power Shard",
+			"Translation": "强化能量碎片"
+		},
+		"Track_PowerStorage": {
+			"Source": "Super Battery",
+			"Translation": "超级蓄电池"
+		},
+		"Track_Storage": {
+			"Source": "Cloud Capacity",
+			"Translation": "云端容量"
+		},
+		"TreeDesc_Remote_Factory": {
+			"Source": "Research the Smart Factory's upgrade buildings level by level in the MAM. Each level costs more than the last; the matching building scales automatically.",
+			"Translation": "在 MAM 里逐级研究智能工厂的升级建筑。每级成本递增，对应建筑自动强化。"
+		},
+		"Tree_Remote_Factory": {
+			"Source": "Smart Factory",
+			"Translation": "智能工厂"
+		},
+		"Upgrade_Accelerator": {
+			"Source": "Production Accelerator",
+			"Translation": "产能加速器"
+		},
+		"Upgrade_CloudDownloader": {
+			"Source": "Cloud Storage Download Station",
+			"Translation": "云端存储下载站"
+		},
+		"Upgrade_CloudFluidDownloader": {
+			"Source": "Cloud Fluid Download Station",
+			"Translation": "云端液态下载站"
+		},
+		"Upgrade_CloudFluidUploader": {
+			"Source": "Cloud Fluid Upload Station",
+			"Translation": "云端液态上传站"
+		},
+		"Upgrade_PowerStorage": {
+			"Source": "Power Storage Unit",
+			"Translation": "超级蓄电池"
+		},
+		"Upgrade_Storage": {
+			"Source": "Cloud Storage Upload Station",
+			"Translation": "云端储存上传站"
+		}
+	}
+}

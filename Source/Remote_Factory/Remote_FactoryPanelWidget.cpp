@@ -134,10 +134,8 @@ static FText WTBuildCollectibleRowText(const FWT_CollectibleEntry& C)
                         C.DisplayName, FText::FromString(DistStr), StateText);
 }
 
-// Localization: the English string is the source language (see
-// Config/Localization/Remote_Factory_Gather.ini). Chinese lives in
-// Content/Localization/Remote_Factory/zh-Hans/Remote_Factory.po.
-// WT_LOCTEXT is defined in Remote_FactoryTypes.h.
+// Localization: the English string is the source language. Translations live in
+// Content/Localization/<culture>.json (see Remote_FactoryLoc.h).
 
 static FText CategoryLabel(int32 Index)
 {
@@ -2269,8 +2267,6 @@ void URemote_FactoryPanelWidget::HandleTeleportResult(AActor* Target, bool bSucc
     {
         if (bSuccess)
         {
-            // ★0.2.137 源串一律用中文：本 mod 的中文环境显示的是**代码字面量**（zh po 运行期并不可靠，
-            // 0.2.135 的英文源串在中文客户端直接漏英），英文走 en archive 的 Translation 兜底。
             StatusText->SetText(FText::Format(WT_LOCTEXT("Status_TeleportedTo", "Teleported to {0}"),
                             FText::FromString(Target ? Target->GetName()
                                                      : WT_LOCTEXT("Target_Generic", "target").ToString())));

@@ -1,6 +1,7 @@
 #include "Remote_FactoryModule.h"
 #include "Remote_FactoryLog.h"
 #include "Remote_FactoryVersion.h"
+#include "Remote_FactoryTranslations.h"
 // 仅为拿到 WT_ENABLE_TRACE 的兜底默认值（未定义时 #if 会当 0 ⇒ 静默走错档位）。
 #include "Remote_FactoryCrashTrace.h"
 
@@ -36,6 +37,8 @@ void FRemote_FactoryModule::StartupModule()
         REMOTE_FACTORY_VERSION_TEXT);
 
     LogBuildProfile();   // ★0.2.36g 档位指纹，紧跟加载横幅（见下方函数注释）
+
+    WT_RegisterTranslations();
 }
 
 /**
