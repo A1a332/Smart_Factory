@@ -1,6 +1,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "FGResearchManager.h"   // EResearchState, AFGResearchManager, OnResearchStateChanged/Completed 委托
+#include "FGSchematic.h"         // UFGSchematic（HandleResearchCompleted 参数）
 #include "FGResearchTreeNode.h"
 #include "FGResearchTree.h"
 #include "Remote_FactoryUpgradeResearch.h"   // EWTUpgradeTrack, WT_MaxUpgradeLevel, WT_ResearchClassFor
@@ -49,6 +51,14 @@ public:
 
     /** ★v0.2.24 三合一版：三条轨道的 20 级节点全部挂进同一棵树（60 节点）。 */
     void ConfigureMergedTree(const FText& DisplayName, const FText& Description);
+
+    /**
+     * ★2026-11-05 崩溃修复：确保树的解锁依赖非空（恒真依赖，树恒解锁）。
+     * 研究树 CDO 会被引擎在处理树时重新初始化、清空 mUnlockDependencies
+     * （表现为 MAM 列表按钮 SetContent 报 "GetDependecyData of length 0"），
+     * 故每次都自查并补回依赖，避免整棵树被判 Locked。
+     */
+    void EnsureUnlockDependencies();
 };
 
 // Three concrete tree classes, one per upgrade track.
@@ -73,6 +83,17 @@ class REMOTE_FACTORY_API UWTResearchTreeMerged : public UWTResearchTreeBase
     GENERATED_BODY()
 };
 
+/**
+ * ★2026-11-07 MAM 连线根治：当前生效的研究树 UClass。
+ * 优先返回**烘焙好的蓝图资产类** BP_WT_ResearchTree_C（MAM 只给资产树画连线），
+ * 资产缺失则回退纯 C++ 类 UWTResearchTreeMerged（最差等于旧行为）。
+ * 所有「写/读树节点」「判断是不是我们这棵树」的地方都必须走它，不得硬编码类。
+ */
+UClass* WT_GetTreeClass();
+
+/** 判定给定树类是否「我们的研究树」（资产类或其回退父类）。 */
+bool WT_IsOurResearchTree(UClass* TreeClass);
+
 /** All research-tree classes, for registration. v0.2.24 起只返回合并后的那一棵。 */
 TArray<TSubclassOf<UFGResearchTree>> WT_GetAllResearchTrees();
 
@@ -81,3 +102,49 @@ TArray<TSubclassOf<UFGResearchTree>> WT_GetAllResearchTrees();
  * POST_INITIALIZATION (content mounted, non-constructor context). Idempotent.
  */
 void WT_BuildResearchTrees();
+
+/**
+ * ★2026-11-05 用户定稿的「一个方块连买 4 次」落地实现：
+ * 买完 Lv1 后，把该方块**同一个坐标**上的节点换成 Lv2（Lv2 覆盖 Lv1），
+ * Lv1 的数值效果不变（升级值取「该轨最高已购级」，存档里那条记录一直在）。
+ *
+ * 必须周期调用（世界侧），因为 MAM 图按坐标索引，同一坐标任何时刻只能有 1 个节点。
+ * 幂等：没有发生推进时不重写树的 mNodes。
+ */
+void WT_AdvanceResearchBlocks(UWorld* World);
+
+/**
+ * ★2026-11-06 崩溃根治：强校验 + 损坏即重建。
+ * 在崩溃发生的那一帧（AFGResearchManager::IsTreeFullyResearched 遍历 mNodes）之前调用，
+ * 若发现 mNodes 中任何节点悬空（释放后被复用、vtable 已损坏，IsValid 会漏判），
+ * 立即整树重建 + 重新推进到正确等级，保证遍历永远拿到有效节点。
+ */
+void WT_ValidateAndRepairTree(UWorld* World);
+
+/**
+ * ★2026-11-06 #44（落地）：研究完成「即时显示下一级」，无需手动关闭重开 MAM。
+ *
+ * 背景：MAM 研究完成时往往只刷新「已完成节点」的视觉，不会重新读整棵合并树，
+ * 于是 WT_AdvanceResearchBlocks 即便把 mNodes 推进到下一级，已打开的面板也读不到
+ * （只有彻底重开 MAM 才会走 IsTreeFullyResearched 钩子重新读树 ⇒ 才见 LV2）。
+ * 本类订阅 AFGResearchManager 的动态委托 OnResearchStateChanged / OnResearchCompleted，
+ * 在研究「完成」那一刻**预先**把合并树推进到下一级 + 刷新已放置升级建筑的实际容量，
+ * 使 MAM 随后（其自身处理器）重读树时拿到的已是更新后的 mNodes ⇒ LV2 立刻出现。
+ *
+ * 我们的处理器在模块 INITIALIZATION（游戏启动）时注册，早于 MAM 控件在打开时才绑定的
+ * 自身处理器，故委托按注册顺序触发时本处理器先跑、MAM 后跑，时序正确。
+ * 三个推进路径（1s 定时器 / IsTreeFullyResearched 钩子 / 本委托）全部幂等，互为兜底。
+ */
+UCLASS()
+class REMOTE_FACTORY_API URemoteFactoryResearchRefresh : public UObject
+{
+    GENERATED_BODY()
+public:
+    /** 研究状态变化（开始/完成）即推进合并树 + 刷新已放置升级建筑。 */
+    UFUNCTION()
+    void HandleResearchStateChanged(EResearchState State);
+
+    /** 研究完成（带 schematic）即推进合并树 + 刷新已放置升级建筑。 */
+    UFUNCTION()
+    void HandleResearchCompleted(TSubclassOf<UFGSchematic> Schematic);
+};

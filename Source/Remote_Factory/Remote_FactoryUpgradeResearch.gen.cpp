@@ -133,7 +133,7 @@ static const int32 GWTResearchDefCount = UE_ARRAY_COUNT(GWTResearchDefs);
 void WT_ConfigureAllResearch()
 {
     // ★0.2.139 闸门（WT_FEATURE_MAM_RESEARCH，用户定案「v1.0.0 前 MAM 科技全部下架」）：
-    //   关=不配这 60 个研究 CDO（省掉启动期资产加载 + 每局 56 条 reward 警告）。
+    //   关=不配这 56 个研究 CDO（省掉启动期资产加载 + 每局 56 条 reward 警告）。
     //   v1.0.0 把 Remote_FactoryRegistry.h 的 WT_FEATURE_MAM_RESEARCH 翻回 true 即恢复。
     if (!WT_FEATURE_MAM_RESEARCH) return;
     static bool bConfigured = false;
@@ -243,7 +243,7 @@ TArray<TSubclassOf<UFGSchematic>> WT_GetAllUpgradeResearch()
 {
     TArray<TSubclassOf<UFGSchematic>> Out;
     // ★0.2.139 闸门（WT_FEATURE_MAM_RESEARCH，用户定案「v1.0.0 前 MAM 科技全部下架」）：
-    //   关=60 条 EST_MAM 节点一条都不注册（进不了 mSchematics ⇒ SML 不 RegisterSchematic）。
+    //   关=56 条 EST_MAM 节点一条都不注册（进不了 mSchematics ⇒ SML 不 RegisterSchematic）。
     //   升级建筑 0.2.56 已整条移除，这些节点当前既不可见也无作用，下架零副作用。
     //   v1.0.0 翻 true 恢复；注意还需让 WT_GetAllResearchTrees() 返回树，MAM 里才看得见。
     if (!WT_FEATURE_MAM_RESEARCH) return Out;

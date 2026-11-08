@@ -28,6 +28,21 @@ UWTMakeTreeCommandlet::UWTMakeTreeCommandlet()
 
 int32 UWTMakeTreeCommandlet::Main(const FString& Params)
 {
+    // ★2026-11-07 修正：无头编辑器里 /Smart_Factory/ 未注册为包根，
+    // 导致 LongPackageNameToFilename 报 "Path does not map to any roots" 而崩溃（rc=3）。
+    // 这里手动把 /Smart_Factory/ 挂到本 mod 的 Content 目录（cook 时 PackageStore 固化同名包，运行时一致）。
+    {
+        FString ModContent = FPaths::ProjectDir();
+        ModContent = FPaths::Combine(ModContent, TEXT("Mods/Smart_Factory/Content"));
+        ModContent = FPaths::ConvertRelativePathToFull(ModContent);
+        if (!ModContent.EndsWith(TEXT("/")) && !ModContent.EndsWith(TEXT("\\")))
+        {
+            ModContent += TEXT("/");
+        }
+        FPackageName::RegisterMountPoint(TEXT("/Smart_Factory/"), *ModContent);
+        UE_LOG(LogWTMakeTree, Warning, TEXT("Registered mount point /Smart_Factory/ -> %s"), *ModContent);
+    }
+
     // ★0.2.137 改名：编辑器按插件目录名挂载，目录已改 Smart_Factory
     const FString AssetPath = TEXT("/Smart_Factory/Research/BP_WT_ResearchTree");
     const FName   AssetName = FName("BP_WT_ResearchTree");

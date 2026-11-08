@@ -48,7 +48,16 @@ public class Remote_Factory : ModuleRules {
             "Slate",
             "SlateCore",
             "EnhancedInput", // handheld keybinding
-            "NavigationSystem" // ★0.2.153c: ProjectPointToNavigation fallback for hub landing-spot search
+            "NavigationSystem", // ★0.2.153c: ProjectPointToNavigation fallback for hub landing-spot search
+            // ★1.0.8AW 运行时程序化建模（圆形管道接口）：
+            //   游戏自带 GeometryFramework/GeometryCore/GeometryScriptingCore 三个模块
+            //   （实测 Engine/Binaries/Win64/FactoryGameSteam-GeometryFramework-Win64-Shipping.dll、
+            //     Engine/Plugins/Runtime/GeometryScripting/Binaries/Win64/...GeometryScriptingCore...dll，
+            //     且 FactoryGame 模块本身就把 GeometryFramework 列为依赖），
+            //   所以几何可以在运行时算出来 —— 不需要 cook 任何 .uasset。
+            "GeometryFramework",     // UDynamicMeshComponent
+            "GeometryCore",          // UE::Geometry::FDynamicMesh3
+            "GeometryScriptingCore", // UGeometryScriptLibrary_MeshPrimitiveFunctions::AppendRevolvePolygon
         });
 
         // Editor-only: used by the WTMakeNode commandlet to author the research-tree node

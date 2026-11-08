@@ -3,9 +3,9 @@
 """
 Generate the 56 MAM research-schematic classes for the Remote_Factory upgrade tree.
 
-结构（2026-10-07 用户定案，结构图见 F:/Workbuddy/SMLDev/WT_MAM_研究树结构图.svg）：
+结构（2026-10-07 用户定案，按设计表回退为 2 条末段路线 常规/碎片，无汇合路线，结构图见 F:/Workbuddy/SMLDev/WT_MAM_研究树结构图.svg）：
     3 个功能轨 x 4 个阶段 x 4 级 = 48  （Lv1 ~ Lv16，命名 UWTUpg_{Cap|Sto|Shd}_S{阶段}_L{全局级}）
-  + 末段 2 条路线 x 4 级         =  8  （Lv17 ~ Lv20，命名 UWTUpg_Final{Plain|Boost}_L{级}）
+  + 末段 2 条路线 x 4 级         = 8   （Lv17 ~ Lv20，命名 UWTUpg_Final{Plain|Boost}_L{级}）
   = 56 个 schematic
 
 MAM 树里只放 14 个方块（3 列 x 4 层 = 12 + 末段 2），每个方块内 4 级共用同一个坐标，
@@ -56,7 +56,7 @@ assert len(set(d[0] for d in defs)) == 56
 class_lines = []
 for cls, _t, _l, _r in defs:
     class_lines.append("UCLASS()")
-    class_lines.append("class REMOTEFACTORY_API %s : public UWTUpgradeResearchBase" % cls)
+    class_lines.append("class REMOTE_FACTORY_API %s : public UWTUpgradeResearchBase" % cls)
     class_lines.append("{")
     class_lines.append("    GENERATED_BODY()")
     class_lines.append("public:")
@@ -107,7 +107,9 @@ c.append("};")
 c.append("")
 c.append("static const FWTResearchDef GWTResearchDefs[] = {")
 for cls, tenum, L, rval in defs:
-    rtxt = "EWTFinalRoute::None" if rval == 0 else ("EWTFinalRoute::Plain" if rval == 1 else "EWTFinalRoute::Boost")
+    # RNAME 名字表映射：避免末段多条路线时一律落 Boost（现仅 Plain/Boost 两条末段路线）。
+    RNAME = {0: "None", 1: "Plain", 2: "Boost"}
+    rtxt = "EWTFinalRoute::%s" % RNAME.get(rval, "None")
     c.append("    { %s::StaticClass(), EWTUpgradeTrack::%s, %d, %s }," % (cls, tenum, L, rtxt))
 c.append("};")
 c.append("static const int32 GWTResearchDefCount = UE_ARRAY_COUNT(GWTResearchDefs);")
@@ -117,7 +119,7 @@ c.append("")
 c.append("void WT_ConfigureAllResearch()")
 c.append("{")
 c.append("    // ★0.2.139 闸门（WT_FEATURE_MAM_RESEARCH，用户定案「v1.0.0 前 MAM 科技全部下架」）：")
-c.append("    //   关=不配这 60 个研究 CDO（省掉启动期资产加载 + 每局 56 条 reward 警告）。")
+c.append("    //   关=不配这 56 个研究 CDO（省掉启动期资产加载 + 每局 56 条 reward 警告）。")
 c.append("    //   v1.0.0 把 Remote_FactoryRegistry.h 的 WT_FEATURE_MAM_RESEARCH 翻回 true 即恢复。")
 c.append("    if (!WT_FEATURE_MAM_RESEARCH) return;")
 c.append("    static bool bConfigured = false;")
@@ -171,7 +173,7 @@ c.append("TArray<TSubclassOf<UFGSchematic>> WT_GetAllUpgradeResearch()")
 c.append("{")
 c.append("    TArray<TSubclassOf<UFGSchematic>> Out;")
 c.append("    // ★0.2.139 闸门（WT_FEATURE_MAM_RESEARCH，用户定案「v1.0.0 前 MAM 科技全部下架」）：")
-c.append("    //   关=60 条 EST_MAM 节点一条都不注册（进不了 mSchematics ⇒ SML 不 RegisterSchematic）。")
+c.append("    //   关=56 条 EST_MAM 节点一条都不注册（进不了 mSchematics ⇒ SML 不 RegisterSchematic）。")
 c.append("    //   升级建筑 0.2.56 已整条移除，这些节点当前既不可见也无作用，下架零副作用。")
 c.append("    //   v1.0.0 翻 true 恢复；注意还需让 WT_GetAllResearchTrees() 返回树，MAM 里才看得见。")
 c.append("    if (!WT_FEATURE_MAM_RESEARCH) return Out;")
@@ -196,4 +198,4 @@ if os.path.exists(OLD_GEN_H):
     os.remove(OLD_GEN_H)
 
 print("gen_wt_research.py: %d classes (%d track + %d final) injected into header + .gen.cpp"
-      % (len(defs), 3 * STAGES * PER_STAGE, 2 * len(FINAL_LEVELS)))
+      % (len(defs), 3 * STAGES * PER_STAGE, len(ROUTES) * len(FINAL_LEVELS)))

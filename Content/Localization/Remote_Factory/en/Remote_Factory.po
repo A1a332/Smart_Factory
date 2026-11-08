@@ -3,8 +3,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Remote_Factory\n"
-"POT-Creation-Date: 2026-10-17 07:42\n"
-"PO-Revision-Date: 2026-10-17 07:42\n"
+"POT-Creation-Date: 2026-10-26 21:56\n"
+"PO-Revision-Date: 2026-10-26 21:56\n"
 "Language-Team: \n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
@@ -14,896 +14,1514 @@ msgstr ""
 "X-Crowdin-SourceKey: msgstr\n"
 
 #. Key:	Building_Remote_Factory
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryBuildable.cpp(47)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryBuildable.cpp(47)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryBuildable.cpp(47)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryBuildable.cpp(47)
 msgid ",Building_Remote_Factory"
-msgstr "远程工厂"
+msgstr "智能工厂"
+
+#. Key:	Col_SlugPurple
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(372)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(372)
+msgid "Remote_Factory,Col_SlugPurple"
+msgstr "Power Slug (Purple)"
+
+#. Key:	Col_SlugYellow
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(377)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(377)
+msgid "Remote_Factory,Col_SlugYellow"
+msgstr "Power Slug (Yellow)"
+
+#. Key:	Col_SlugBlue
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(380)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(380)
+msgid "Remote_Factory,Col_SlugBlue"
+msgstr "Power Slug (Blue)"
+
+#. Key:	Col_Somersloop
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(387)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(387)
+msgid "Remote_Factory,Col_Somersloop"
+msgstr "Somersloop"
+
+#. Key:	Col_MercerSphere
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(392)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(392)
+msgid "Remote_Factory,Col_MercerSphere"
+msgstr "Mercer Sphere"
+
+#. Key:	Col_BerylNut
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(401)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(401)
+msgid "Remote_Factory,Col_BerylNut"
+msgstr "绿石果"
+
+#. Key:	Col_PaleBerry
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(406)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(406)
+msgid "Remote_Factory,Col_PaleBerry"
+msgstr "古莓"
+
+#. Key:	Col_BaconAgaric
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(411)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryCollectibles.cpp(411)
+msgid "Remote_Factory,Col_BaconAgaric"
+msgstr "培根伞菌"
 
 #. Key:	EquipDesc_PortableTerminal
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryEquipment.cpp(1138)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryEquipment.cpp(1138)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryEquipment.cpp(3064)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryEquipment.cpp(3064)
 msgid ",EquipDesc_PortableTerminal"
-msgstr "A handheld Remote Factory. Craft it at a workbench and put it in an arm slot -- drawing it opens the factory console instantly, so you can check output, open a machine's own panel and pull items while standing at the miner instead of walking back to the HUB."
+msgstr "A handheld Smart Factory. Craft it at a workbench and put it in an arm slot -- drawing it opens the factory console instantly, so you can check output, open a machine's own panel and pull items while standing at the miner instead of walking back to the HUB."
 
 #. Key:	Equip_PortableTerminal
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryEquipment.cpp(190)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryEquipment.cpp(190)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryEquipment.cpp(482)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryEquipment.cpp(482)
 msgid ",Equip_PortableTerminal"
-msgstr "远程工厂"
-
-#. Key:	Btn_Close
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(102)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(102)
-msgid ",Btn_Close"
-msgstr "Close"
-
-#. Key:	FluidPanel_NoTarget
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(218)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(218)
-msgid ",FluidPanel_NoTarget"
-msgstr "Open this panel on a Cloud Fluid Download Station."
-
-#. Key:	FluidPanel_NoFluids
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(224)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(224)
-msgid ",FluidPanel_NoFluids"
-msgstr "The cloud holds no fluids yet. Connect a Cloud Fluid Upload Station to a pipe."
-
-#. Key:	FluidPanel_CurrentFmt
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(230)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(230)
-msgid ",FluidPanel_CurrentFmt"
-msgstr "Current: {0}"
-
-#. Key:	FluidPanel_None
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(233)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(233)
-msgid ",FluidPanel_None"
-msgstr "<none>"
-
-#. Key:	FluidPanel_RowFmt
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(243)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(243)
-msgid ",FluidPanel_RowFmt"
-msgstr "{0} · {1}"
+msgstr "智能工厂"
 
 #. Key:	FluidPanel_Title
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(86)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(86)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(104)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(104)
 msgid ",FluidPanel_Title"
 msgstr "Cloud Fluid Download Station · Pick a Fluid"
 
 #. Key:	Btn_Refresh
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(94)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(94)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(112)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(112)
 msgid ",Btn_Refresh"
 msgstr "Refresh"
 
-#. Key:	ColRow
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(120)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(120)
-msgid ",ColRow"
-msgstr "{0}   {1}   {2}"
-
-#. Key:	ColState_Collected
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(123)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(123)
-msgid ",ColState_Collected"
-msgstr "已拾取"
-
-#. Key:	ColState_Uncollected
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(124)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(124)
-msgid ",ColState_Uncollected"
-msgstr "未拾取"
-
-#. Key:	Top_Building
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1244)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1244)
-msgid ",Top_Building"
-msgstr "建筑"
-
-#. Key:	Top_Container
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1245)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1245)
-msgid ",Top_Container"
-msgstr "容器"
-
-#. Key:	Top_Alien
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1246)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1246)
-msgid ",Top_Alien"
-msgstr "外星科技"
-
-#. Key:	Arrow_Down
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1259)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1259)
-msgid ",Arrow_Down"
-msgstr "▼"
-
-#. Key:	Arrow_Right
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1259)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1259)
-msgid ",Arrow_Right"
-msgstr "▶"
-
-#. Key:	TopLabel
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1261)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1261)
-msgid ",TopLabel"
-msgstr "{0}  {1}  ({2})"
-
-#. Key:	Sub_WithCount
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1285)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1285)
-msgid ",Sub_WithCount"
-msgstr "    {0}  ({1})"
-
-#. Key:	Sub_Plain
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1286)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1286)
-msgid ",Sub_Plain"
-msgstr "    {0}"
-
-#. Key:	Cat_Producer
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(137)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(137)
-msgid ",Cat_Producer"
-msgstr "Production"
-
-#. Key:	Cat_Container
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(138)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(138)
-msgid ",Cat_Container"
-msgstr "Storage"
-
-#. Key:	Sub2_WithCount
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1386)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1386)
-msgid ",Sub2_WithCount"
-msgstr "        {0}  ({1})"
-
-#. Key:	Sub2_Plain
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1388)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1388)
-msgid ",Sub2_Plain"
-msgstr "        {0}"
-
-#. Key:	Cat_Miner
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(139)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(139)
-msgid ",Cat_Miner"
-msgstr "Extraction"
-
-#. Key:	Cat_Generator
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(140)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(140)
-msgid ",Cat_Generator"
-msgstr "Power Generation"
-
-#. Key:	Cat_PowerSwitch
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(141)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(141)
-msgid ",Cat_PowerSwitch"
-msgstr "Power Switch"
-
-#. Key:	Cat_AwesomeSink
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(142)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(142)
-msgid ",Cat_AwesomeSink"
-msgstr "Resource Sink"
-
-#. Key:	Cat_Hub
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(143)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(143)
-msgid ",Cat_Hub"
-msgstr "HUB"
-
-#. Key:	Cat_SpaceElevator
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(144)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(144)
-msgid ",Cat_SpaceElevator"
-msgstr "Space Elevator"
-
-#. Key:	Cat_WorkBench
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(145)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(145)
-msgid ",Cat_WorkBench"
-msgstr "Workbench"
-
-#. Key:	Cat_MAM
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(146)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(146)
-msgid ",Cat_MAM"
-msgstr "MAM"
-
-#. Key:	Btn_RowTeleport
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1466)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1466)
-msgid ",Btn_RowTeleport"
-msgstr "传送"
-
-#. Key:	Cat_DropPod
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(147)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(147)
-msgid ",Cat_DropPod"
-msgstr "Drop Pod"
-
-#. Key:	Cat_Other
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(148)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(148)
-msgid ",Cat_Other"
-msgstr "Other"
-
-#. Key:	MachineRow
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1528)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1528)
-msgid ",MachineRow"
-msgstr "{0}   {1}m   {2}"
-
-#. Key:	Btn_RowOpen
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1583)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1583)
-msgid ",Btn_RowOpen"
-msgstr "打开面板"
-
-#. Key:	Col_SlugBlue
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(170)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(170)
-msgid ",Col_SlugBlue"
-msgstr "Power Slug (Blue)"
-
-#. Key:	Col_SlugYellow
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(171)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(171)
-msgid ",Col_SlugYellow"
-msgstr "Power Slug (Yellow)"
-
-#. Key:	Col_SlugPurple
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(172)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(172)
-msgid ",Col_SlugPurple"
-msgstr "Power Slug (Purple)"
-
-#. Key:	Col_MercerSphere
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(173)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(173)
-msgid ",Col_MercerSphere"
-msgstr "Mercer Sphere"
-
-#. Key:	Col_Somersloop
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(174)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(174)
-msgid ",Col_Somersloop"
-msgstr "Somersloop"
-
-#. Key:	Detail_NoMachineSelected
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1744)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1744)
-msgid ",Detail_NoMachineSelected"
-msgstr "No machine selected"
-
-#. Key:	Col_DropPod
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(175)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(175)
-msgid ",Col_DropPod"
-msgstr "Drop Pod"
-
-#. Key:	Detail_DistanceAndStatus
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1757)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1757)
-msgid ",Detail_DistanceAndStatus"
-msgstr "{0}m away · {1}"
-
-#. Key:	Col_Other
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(176)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(176)
-msgid ",Col_Other"
-msgstr "Other"
-
-#. Key:	Item_Unknown
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1789)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1789)
-msgid ",Item_Unknown"
-msgstr "Unknown item"
-
-#. Key:	Output_None
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1794)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1794)
-msgid ",Output_None"
-msgstr "(no output)"
-
-#. Key:	SwitchState_NotWired
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1835)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1835)
-msgid ",SwitchState_NotWired"
-msgstr "Not wired — both ends of the switch must be connected to a power grid."
-
-#. Key:	Switch_On
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1841)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1841)
-msgid ",Switch_On"
-msgstr "On"
-
-#. Key:	Switch_Off
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1842)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1842)
-msgid ",Switch_Off"
-msgstr "Off"
-
-#. Key:	SwitchState_WithPriority
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1846)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1846)
-msgid ",SwitchState_WithPriority"
-msgstr "Now: {0}　limit priority {1}"
-
-#. Key:	SwitchState_NoLimiter
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1852)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1852)
-msgid ",SwitchState_NoLimiter"
-msgstr "Now: {0}　never auto-limits"
-
-#. Key:	SwitchState_Plain
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1858)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1858)
-msgid ",SwitchState_Plain"
-msgstr "Now: {0}"
-
-#. Key:	ColPick_Done
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(186)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(186)
-msgid ",ColPick_Done"
-msgstr "【已拾取】"
-
-#. Key:	ColPick_Open
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(187)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(187)
-msgid ",ColPick_Open"
-msgstr "【未拾取】"
-
-#. Key:	Btn_SwitchOff
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1872)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1872)
-msgid ",Btn_SwitchOff"
-msgstr "Turn off"
-
-#. Key:	Header_PrioritySwitch
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1894)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1894)
-msgid ",Header_PrioritySwitch"
-msgstr "Power Switch · Priority Switch"
-
-#. Key:	Status_TeleportedTo
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1905)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1905)
-msgid ",Status_TeleportedTo"
-msgstr "Teleported to {0}"
-
-#. Key:	Target_Generic
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1907)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1907)
-msgid ",Target_Generic"
-msgstr "target"
-
-#. Key:	Status_TeleportFailed
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1908)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1908)
-msgid ",Status_TeleportFailed"
-msgstr "Teleport failed: the target is gone"
-
-#. Key:	Col_Header
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2059)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2059)
-msgid ",Col_Header"
-msgstr "Alien Energy"
-
-#. Key:	Col_RegionUnknown
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2085)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2085)
-msgid ",Col_RegionUnknown"
-msgstr "未知区域"
-
-#. Key:	Col_SelectedDistance
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2130)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2130)
-msgid ",Col_SelectedDistance"
-msgstr "Selected: {0}   {1} km away"
-
-#. Key:	Col_PickToTeleport
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2142)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2142)
-msgid ",Col_PickToTeleport"
-msgstr "Pick an alien-energy target to teleport to"
-
-#. Key:	Title
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(257)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(257)
-msgid ",Title"
-msgstr "远程工厂 · 终端面板"
-
-#. Key:	Status_Scanning
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(272)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(272)
-msgid ",Status_Scanning"
-msgstr "Scanning…"
-
-#. Key:	Power_Reading
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(313)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(313)
-msgid ",Power_Reading"
-msgstr "Power  reading…"
-
-#. Key:	Detail_NoMachine
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(401)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(401)
-msgid ",Detail_NoMachine"
-msgstr "No machine selected"
-
-#. Key:	Btn_OpenMachinePanel
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(419)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(419)
-msgid ",Btn_OpenMachinePanel"
-msgstr "Open machine panel"
-
-#. Key:	Btn_PullOutput
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(426)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(426)
-msgid ",Btn_PullOutput"
-msgstr "Take output"
-
-#. Key:	Btn_TeleportToMachine
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(433)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(433)
-msgid ",Btn_TeleportToMachine"
-msgstr "Teleport to this machine"
-
-#. Key:	Header_Switch
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(450)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(450)
-msgid ",Header_Switch"
-msgstr "Power Switch"
-
-#. Key:	Btn_SwitchOn
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(465)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(465)
-msgid ",Btn_SwitchOn"
-msgstr "Turn on"
-
-#. Key:	Btn_PriorityDown
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(479)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(479)
-msgid ",Btn_PriorityDown"
-msgstr "Priority -"
-
-#. Key:	Btn_NoAutoLimit
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(487)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(487)
-msgid ",Btn_NoAutoLimit"
-msgstr "Never auto-limit"
-
-#. Key:	Btn_PriorityUp
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(495)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(495)
-msgid ",Btn_PriorityUp"
-msgstr "Priority +"
+#. Key:	Btn_Close
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(120)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(120)
+msgid ",Btn_Close"
+msgstr "Close"
+
+#. Key:	FluidPanel_NoTarget
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(285)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(285)
+msgid ",FluidPanel_NoTarget"
+msgstr "Open this panel on a Cloud Fluid Download Station."
+
+#. Key:	FluidPanel_NoFluids
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(291)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(291)
+msgid ",FluidPanel_NoFluids"
+msgstr "The cloud holds no fluids yet. Connect a Cloud Fluid Upload Station to a pipe."
+
+#. Key:	FluidPanel_CurrentFmt
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(297)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(297)
+msgid ",FluidPanel_CurrentFmt"
+msgstr "Current: {0}"
+
+#. Key:	FluidPanel_None
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(300)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(300)
+msgid ",FluidPanel_None"
+msgstr "<none>"
+
+#. Key:	FluidPanel_RowFmt
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(310)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryFluidPanel.cpp(310)
+msgid ",FluidPanel_RowFmt"
+msgstr "{0} · {1}"
+
+#. Key:	ItemPanel_NoTarget
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(1004)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(1004)
+msgid ",ItemPanel_NoTarget"
+msgstr "请在云端存储下载站上打开本面板。"
+
+#. Key:	ItemPanel_PickedFmt
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(1021)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(1021)
+msgid ",ItemPanel_PickedFmt"
+msgstr "当前只下载：{0}　云端剩余 {1} · 本站缓冲 {2}　—— 要更换请点该行最右侧的【更换】"
+
+#. Key:	ItemPanel_AllNote
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(1029)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(1029)
+msgid ",ItemPanel_AllNote"
+msgstr "列表只显示云端当前有存货的物品。未选择 = 输出云端里的全部物品；点【选择】指定一种，此后只下载那一种。"
+
+#. Key:	ItemPanel_Empty
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(1037)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(1037)
+msgid ",ItemPanel_Empty"
+msgstr "没有可下载的固体物品。请查看日志中的 [item-panel]。"
+
+#. Key:	ItemPanel_NoMatch
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(1038)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(1038)
+msgid ",ItemPanel_NoMatch"
+msgstr "没有匹配该搜索词的物品。"
+
+#. Key:	ItemPanel_EmptyCloud
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(1045)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(1045)
+msgid ",ItemPanel_EmptyCloud"
+msgstr "云端池里现在没有任何物品 —— 先上传一些物品，这里才会列出它们。"
+
+#. Key:	ItemPanel_AllZeroFmt
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(1047)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(1047)
+msgid ",ItemPanel_AllZeroFmt"
+msgstr "搜索到的 {0} 种物品在云端都没有存货。"
+
+#. Key:	ItemPanel_Title
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(145)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(145)
+msgid ",ItemPanel_Title"
+msgstr "云端存储下载站 · 输出物品"
+
+#. Key:	Btn_ClearSelection
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(156)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(156)
+msgid ",Btn_ClearSelection"
+msgstr "清空"
+
+#. Key:	ItemPanel_SearchHint
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(220)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(220)
+msgid ",ItemPanel_SearchHint"
+msgstr "搜索物品名称…"
+
+#. Key:	Btn_Change
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(781)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(781)
+msgid ",Btn_Change"
+msgstr "更换"
+
+#. Key:	Btn_Pick
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(782)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(782)
+msgid ",Btn_Pick"
+msgstr "选择"
+
+#. Key:	ItemPanel_AmountFmt
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(975)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(975)
+msgid ",ItemPanel_AmountFmt"
+msgstr "云端 {0}"
+
+#. Key:	ItemPanel_AmountZero
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(976)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryItemSelectPanel.cpp(976)
+msgid ",ItemPanel_AmountZero"
+msgstr "云端 0"
 
 #. Key:	Status_MachineCountTruncated
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(750)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(750)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1228)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1228)
 msgid ",Status_MachineCountTruncated"
 msgstr "{0} machines listed (factory exceeds list cap - nearest shown)"
 
 #. Key:	Status_MachineCountRendered
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(757)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(757)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1235)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1235)
 msgid ",Status_MachineCountRendered"
 msgstr "{0} machines (list draws nearest {1})"
 
 #. Key:	Status_MachineCount
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(762)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(762)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1240)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1240)
 msgid ",Status_MachineCount"
 msgstr "{0} machines"
 
 #. Key:	Shared_YouAreOwner
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(812)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(812)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1291)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1291)
 msgid ",Shared_YouAreOwner"
 msgstr "Sharing · you are the host ({0} others watching)"
 
 #. Key:	Shared_ViewerMode
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(821)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(821)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1300)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1300)
 msgid ",Shared_ViewerMode"
 msgstr "Sharing · host: {0} (view-only, cannot operate)"
 
 #. Key:	Shared_OtherPlayer
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(822)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(822)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1301)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1301)
 msgid ",Shared_OtherPlayer"
 msgstr "another player"
 
 #. Key:	Power_Readout
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(840)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(840)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1319)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1319)
 msgid ",Power_Readout"
 msgstr "Gen {0} / {1} MW      Use {2} / {3} MW\nStored {4} / {5} MWh      Grids {6}"
 
 #. Key:	Status_PulledItems
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(962)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(962)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1509)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1509)
 msgid ",Status_PulledItems"
 msgstr "Took {0} items"
 
 #. Key:	Status_NothingToPull
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(964)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(964)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1511)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1511)
 msgid ",Status_NothingToPull"
 msgstr "There is no output to take"
 
+#. Key:	ProdState_Running
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(189)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(189)
+msgid ",ProdState_Running"
+msgstr "运行中"
+
+#. Key:	ProdState_Standby
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(190)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(190)
+msgid ",ProdState_Standby"
+msgstr "待机"
+
+#. Key:	ProdState_Blocked
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(191)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(191)
+msgid ",ProdState_Blocked"
+msgstr "阻塞"
+
+#. Key:	Top_ResourceNode
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1916)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1916)
+msgid ",Top_ResourceNode"
+msgstr "资源节点"
+
+#. Key:	Top_Building
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1917)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1917)
+msgid ",Top_Building"
+msgstr "建筑"
+
+#. Key:	Top_Alien
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1918)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1918)
+msgid ",Top_Alien"
+msgstr "收集品"
+
+#. Key:	ProdState_Idle
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(192)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(192)
+msgid ",ProdState_Idle"
+msgstr "空闲"
+
+#. Key:	Arrow_Down
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1994)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1994)
+msgid ",Arrow_Down"
+msgstr "▼"
+
+#. Key:	Arrow_Right
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1994)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1994)
+msgid ",Arrow_Right"
+msgstr "▶"
+
+#. Key:	TopLabel
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1996)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(1996)
+msgid ",TopLabel"
+msgstr "{0}  ({1})"
+
+#. Key:	Sub_WithCount
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2030)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2030)
+msgid ",Sub_WithCount"
+msgstr "{0}  ({1})"
+
+#. Key:	Sub_Plain
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2031)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2031)
+msgid ",Sub_Plain"
+msgstr "{0}"
+
+#. Key:	ResourceNode_CustomMap
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2051)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2051)
+msgid ",ResourceNode_CustomMap"
+msgstr "自定义地图 · 原版矿点不适用"
+
+#. Key:	ResourceNode_FileEmpty
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2054)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2054)
+msgid ",ResourceNode_FileEmpty"
+msgstr "矿点数据为空 · 控制台执行 wt.DumpResourceNodes"
+
+#. Key:	ResourceNode_NoFile
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2056)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2056)
+msgid ",ResourceNode_NoFile"
+msgstr "矿点数据未生成 · 控制台执行 wt.DumpResourceNodes（多次跑图积累全图）"
+
+#. Key:	Collectible_CustomMap
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2108)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2108)
+msgid ",Collectible_CustomMap"
+msgstr "本图为自定义地图 · 原版收集品不适用"
+
+#. Key:	Collectible_None
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2110)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2110)
+msgid ",Collectible_None"
+msgstr "本图无收集品 · 传送不可用"
+
+#. Key:	Sub2_WithCount
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2200)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2200)
+msgid ",Sub2_WithCount"
+msgstr "{0}  ({1})"
+
+#. Key:	Sub2_Plain
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2202)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2202)
+msgid ",Sub2_Plain"
+msgstr "{0}"
+
+#. Key:	Hub_Tp
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2369)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2369)
+msgid ",Hub_Tp"
+msgstr "传送"
+
+#. Key:	Hub_Open
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2371)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2371)
+msgid ",Hub_Open"
+msgstr "打开"
+
+#. Key:	FltItem_All
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2952)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(2952)
+msgid ",FltItem_All"
+msgstr "全部物品"
+
+#. Key:	FltType_All
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3004)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3004)
+msgid ",FltType_All"
+msgstr "全部类型"
+
+#. Key:	FltCap_Sort
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3048)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3048)
+msgid ",FltCap_Sort"
+msgstr "排序"
+
+#. Key:	FltState_All
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3080)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3080)
+msgid ",FltState_All"
+msgstr "全部状态"
+
+#. Key:	FltState_Idle
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3081)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3081)
+msgid ",FltState_Idle"
+msgstr "空闲"
+
+#. Key:	FltState_Running
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3082)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3082)
+msgid ",FltState_Running"
+msgstr "运行中"
+
+#. Key:	FltState_Standby
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3083)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3083)
+msgid ",FltState_Standby"
+msgstr "待机"
+
+#. Key:	FltState_Blocked
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3084)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3084)
+msgid ",FltState_Blocked"
+msgstr "阻塞"
+
+#. Key:	FltAmt_All
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3087)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3087)
+msgid ",FltAmt_All"
+msgstr "全部数量"
+
+#. Key:	FltAmt_Empty
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3088)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3088)
+msgid ",FltAmt_Empty"
+msgstr "空"
+
+#. Key:	FltAmt_Low
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3089)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3089)
+msgid ",FltAmt_Low"
+msgstr "少量"
+
+#. Key:	FltAmt_Mid
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3090)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3090)
+msgid ",FltAmt_Mid"
+msgstr "中量"
+
+#. Key:	FltAmt_High
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3091)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3091)
+msgid ",FltAmt_High"
+msgstr "大量"
+
+#. Key:	FltPur_All
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3094)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3094)
+msgid ",FltPur_All"
+msgstr "全部纯度"
+
+#. Key:	FltPur_Impure
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3095)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3095)
+msgid ",FltPur_Impure"
+msgstr "贫瘠"
+
+#. Key:	FltPur_Normal
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3096)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3096)
+msgid ",FltPur_Normal"
+msgstr "普通"
+
+#. Key:	FltPur_Pure
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3097)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3097)
+msgid ",FltPur_Pure"
+msgstr "纯"
+
+#. Key:	FltDist_All
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3100)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3100)
+msgid ",FltDist_All"
+msgstr "全部距离"
+
+#. Key:	FltDist_100
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3101)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3101)
+msgid ",FltDist_100"
+msgstr "100m 内"
+
+#. Key:	FltDist_500
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3102)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3102)
+msgid ",FltDist_500"
+msgstr "500m 内"
+
+#. Key:	FltDist_1k
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3103)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3103)
+msgid ",FltDist_1k"
+msgstr "1km 内"
+
+#. Key:	FltIssue_All
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3111)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3111)
+msgid ",FltIssue_All"
+msgstr "全部问题"
+
+#. Key:	FltIssue_Any
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3112)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3112)
+msgid ",FltIssue_Any"
+msgstr "任意问题"
+
+#. Key:	FltIssue_Blocked
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3113)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3113)
+msgid ",FltIssue_Blocked"
+msgstr "输出堵塞"
+
+#. Key:	FltIssue_Starved
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3114)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3114)
+msgid ",FltIssue_Starved"
+msgstr "输入缺料"
+
+#. Key:	FltIssue_NoPower
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3115)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3115)
+msgid ",FltIssue_NoPower"
+msgstr "未接电网"
+
+#. Key:	FltIssue_NoLogi
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3116)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3116)
+msgid ",FltIssue_NoLogi"
+msgstr "未接物流"
+
+#. Key:	FltIssue_Overclk
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3117)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3117)
+msgid ",FltIssue_Overclk"
+msgstr "已超频"
+
+#. Key:	FltIssue_NoFuel
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3118)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3118)
+msgid ",FltIssue_NoFuel"
+msgstr "燃料不足"
+
+#. Key:	FltIssue_Full
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3119)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3119)
+msgid ",FltIssue_Full"
+msgstr "已满"
+
+#. Key:	FltIssue_Empty
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3120)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3120)
+msgid ",FltIssue_Empty"
+msgstr "已空"
+
+#. Key:	FltRatio_All
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3123)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3123)
+msgid ",FltRatio_All"
+msgstr "全部分段"
+
+#. Key:	FltRatio_25
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3124)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3124)
+msgid ",FltRatio_25"
+msgstr "0-25%"
+
+#. Key:	FltRatio_50
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3125)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3125)
+msgid ",FltRatio_50"
+msgstr "25-50%"
+
+#. Key:	FltRatio_75
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3126)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3126)
+msgid ",FltRatio_75"
+msgstr "50-75%"
+
+#. Key:	FltRatio_100
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3127)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3127)
+msgid ",FltRatio_100"
+msgstr "75-100%"
+
+#. Key:	FltCap_Type
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3137)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3137)
+msgid ",FltCap_Type"
+msgstr "类型"
+
+#. Key:	FltCap_State
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3139)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3139)
+msgid ",FltCap_State"
+msgstr "状态"
+
+#. Key:	FltCap_Product
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3141)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3141)
+msgid ",FltCap_Product"
+msgstr "产物"
+
+#. Key:	FltCap_Issue
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3143)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3143)
+msgid ",FltCap_Issue"
+msgstr "问题"
+
+#. Key:	FltCap_Eff
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3145)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3145)
+msgid ",FltCap_Eff"
+msgstr "效率"
+
+#. Key:	FltCap_Node
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3156)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3156)
+msgid ",FltCap_Node"
+msgstr "资源节点"
+
+#. Key:	FltCap_Purity
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3158)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3158)
+msgid ",FltCap_Purity"
+msgstr "纯度"
+
+#. Key:	FltCap_Fuel
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3170)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3170)
+msgid ",FltCap_Fuel"
+msgstr "燃料"
+
+#. Key:	FltCap_Item
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3181)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3181)
+msgid ",FltCap_Item"
+msgstr "物品"
+
+#. Key:	FltCap_Amount
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3183)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3183)
+msgid ",FltCap_Amount"
+msgstr "数量"
+
+#. Key:	FltCap_Fill
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3185)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3185)
+msgid ",FltCap_Fill"
+msgstr "填充率"
+
+#. Key:	FltCap_Dist
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3243)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3243)
+msgid ",FltCap_Dist"
+msgstr "距离"
+
+#. Key:	ResourceNode_PuritySource
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3278)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3278)
+msgid ",ResourceNode_PuritySource"
+msgstr "纯度来源：{0}（非原版值）· {1}"
+
+#. Key:	ColState_Collected
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(335)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(335)
+msgid ",ColState_Collected"
+msgstr "已拾取"
+
+#. Key:	ColState_Uncollected
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(336)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(336)
+msgid ",ColState_Uncollected"
+msgstr "未拾取"
+
+#. Key:	ColRow_Cave
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(341)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(341)
+msgid ",ColRow_Cave"
+msgstr "{0}   {1}   {2}   [溶洞]"
+
+#. Key:	ColRow
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(343)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(343)
+msgid ",ColRow"
+msgstr "{0}   {1}   {2}"
+
+#. Key:	Cat_Producer
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(356)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(356)
+msgid ",Cat_Producer"
+msgstr "Production"
+
+#. Key:	Cat_Container
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(357)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(357)
+msgid ",Cat_Container"
+msgstr "容器"
+
+#. Key:	Btn_RowTeleport
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3578)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3578)
+msgid ",Btn_RowTeleport"
+msgstr "传送"
+
+#. Key:	Cat_Miner
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(358)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(358)
+msgid ",Cat_Miner"
+msgstr "Extraction"
+
+#. Key:	Cat_Generator
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(359)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(359)
+msgid ",Cat_Generator"
+msgstr "Power Generation"
+
+#. Key:	Cat_PowerSwitch
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(360)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(360)
+msgid ",Cat_PowerSwitch"
+msgstr "Power Switch"
+
+#. Key:	Cat_AwesomeSink
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(361)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(361)
+msgid ",Cat_AwesomeSink"
+msgstr "Resource Sink"
+
+#. Key:	Cat_Hub
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(362)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(362)
+msgid ",Cat_Hub"
+msgstr "HUB"
+
+#. Key:	Cat_SpaceElevator
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(363)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(363)
+msgid ",Cat_SpaceElevator"
+msgstr "Space Elevator"
+
+#. Key:	Cat_MAM
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(364)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(364)
+msgid ",Cat_MAM"
+msgstr "MAM"
+
+#. Key:	Cat_DropPod
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(365)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(365)
+msgid ",Cat_DropPod"
+msgstr "Drop Pod"
+
+#. Key:	Cat_Modded
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(366)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(366)
+msgid ",Cat_Modded"
+msgstr "MOD建筑"
+
+#. Key:	Cat_Shop
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(367)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(367)
+msgid ",Cat_Shop"
+msgstr "AWESOME商店"
+
+#. Key:	Cat_CraftBench
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(368)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(368)
+msgid ",Cat_CraftBench"
+msgstr "制作台"
+
+#. Key:	Cat_EquipWorkshop
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(369)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(369)
+msgid ",Cat_EquipWorkshop"
+msgstr "装备工坊"
+
+#. Key:	Cat_Vehicle
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(370)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(370)
+msgid ",Cat_Vehicle"
+msgstr "运输工具"
+
+#. Key:	Cat_Portal
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(371)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(371)
+msgid ",Cat_Portal"
+msgstr "传送门"
+
+#. Key:	Cat_Station
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(372)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(372)
+msgid ",Cat_Station"
+msgstr "车站"
+
+#. Key:	Cat_RNVanilla
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(373)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(373)
+msgid ",Cat_RNVanilla"
+msgstr "原版"
+
+#. Key:	Cat_RNMod
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(374)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(374)
+msgid ",Cat_RNMod"
+msgstr "MOD"
+
+#. Key:	MachineRowName
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3740)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3740)
+msgid ",MachineRowName"
+msgstr "{0}   {1}m"
+
+#. Key:	Cat_PowerGrid
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(376)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(376)
+msgid ",Cat_PowerGrid"
+msgstr "电网"
+
+#. Key:	Cat_Other
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(377)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(377)
+msgid ",Cat_Other"
+msgstr "Other"
+
+#. Key:	Btn_RowOpen
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3868)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3868)
+msgid ",Btn_RowOpen"
+msgstr "打开面板"
+
+#. Key:	FoldOpen
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3975)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3975)
+msgid ",FoldOpen"
+msgstr "▼"
+
+#. Key:	FoldClosed
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3976)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3976)
+msgid ",FoldClosed"
+msgstr "▶"
+
+#. Key:	MachineGroupHeader
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3978)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(3978)
+msgid ",MachineGroupHeader"
+msgstr "{0} ×{1} · 最近 {2}m"
+
+#. Key:	Grid_Consumed
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(406)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(406)
+msgid ",Grid_Consumed"
+msgstr "消耗"
+
+#. Key:	Grid_Peak
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(407)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(407)
+msgid ",Grid_Peak"
+msgstr "最大消耗"
+
+#. Key:	MachineGroupMore
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4073)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4073)
+msgid ",MachineGroupMore"
+msgstr "…另有 {0} 台同型机器（已显示最近的 {1} 台）"
+
+#. Key:	Grid_Produced
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(408)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(408)
+msgid ",Grid_Produced"
+msgstr "发电"
+
+#. Key:	Grid_Capacity
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(409)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(409)
+msgid ",Grid_Capacity"
+msgstr "上限"
+
+#. Key:	Grid_Boost
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(410)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(410)
+msgid ",Grid_Boost"
+msgstr "能源增幅"
+
+#. Key:	Grid_None
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4148)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4148)
+msgid ",Grid_None"
+msgstr "还没有电网：铺好电线杆并接入电路后，这里会显示电力曲线。"
+
+#. Key:	Grid_RowName
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4221)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4221)
+msgid ",Grid_RowName"
+msgstr "电网 #{0}"
+
+#. Key:	Grid_RowScale
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4243)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4243)
+msgid ",Grid_RowScale"
+msgstr "{0} 根杆 · 接线 {1}/{2}"
+
+#. Key:	Grid_Powered
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4258)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4258)
+msgid ",Grid_Powered"
+msgstr "供电中"
+
+#. Key:	Grid_FuseBlown
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4262)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4262)
+msgid ",Grid_FuseBlown"
+msgstr "保险丝已跳闸"
+
+#. Key:	Grid_NoPower
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4267)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4267)
+msgid ",Grid_NoPower"
+msgstr "无电"
+
+#. Key:	Grid_HistoryNote
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4309)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4309)
+msgid ",Grid_HistoryNote"
+msgstr "曲线覆盖近 {0} 秒（每格约 {1} 秒）· 快照，点顶部「刷新」重新采集"
+
+#. Key:	Col_SlugBlue
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(440)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(440)
+msgid ",Col_SlugBlue"
+msgstr "Power Slug (Blue)"
+
+#. Key:	Col_SlugYellow
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(441)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(441)
+msgid ",Col_SlugYellow"
+msgstr "Power Slug (Yellow)"
+
+#. Key:	Col_SlugPurple
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(442)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(442)
+msgid ",Col_SlugPurple"
+msgstr "Power Slug (Purple)"
+
+#. Key:	Col_MercerSphere
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(443)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(443)
+msgid ",Col_MercerSphere"
+msgstr "Mercer Sphere"
+
+#. Key:	Col_Somersloop
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(444)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(444)
+msgid ",Col_Somersloop"
+msgstr "Somersloop"
+
+#. Key:	Col_DropPod
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(445)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(445)
+msgid ",Col_DropPod"
+msgstr "Drop Pod"
+
+#. Key:	Col_BerylNut
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(446)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(446)
+msgid ",Col_BerylNut"
+msgstr "绿石果"
+
+#. Key:	Col_PaleBerry
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(447)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(447)
+msgid ",Col_PaleBerry"
+msgstr "古莓"
+
+#. Key:	Col_BaconAgaric
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(448)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(448)
+msgid ",Col_BaconAgaric"
+msgstr "培根伞菌"
+
+#. Key:	Col_Other
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(449)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(449)
+msgid ",Col_Other"
+msgstr "Other"
+
+#. Key:	Detail_NoMachineSelected
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4510)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4510)
+msgid ",Detail_NoMachineSelected"
+msgstr "No machine selected"
+
+#. Key:	Detail_DistanceAndStatus
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4523)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4523)
+msgid ",Detail_DistanceAndStatus"
+msgstr "{0}m away · {1}"
+
+#. Key:	Item_Unknown
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4555)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4555)
+msgid ",Item_Unknown"
+msgstr "Unknown item"
+
+#. Key:	Output_None
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4560)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4560)
+msgid ",Output_None"
+msgstr "(no output)"
+
+#. Key:	ColPick_Done
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(459)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(459)
+msgid ",ColPick_Done"
+msgstr "【已拾取】"
+
+#. Key:	ColPick_Open
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(460)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(460)
+msgid ",ColPick_Open"
+msgstr "【未拾取】"
+
+#. Key:	SwitchState_NotWired
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4601)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4601)
+msgid ",SwitchState_NotWired"
+msgstr "Not wired — both ends of the switch must be connected to a power grid."
+
+#. Key:	Switch_On
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4607)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4607)
+msgid ",Switch_On"
+msgstr "On"
+
+#. Key:	Switch_Off
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4608)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4608)
+msgid ",Switch_Off"
+msgstr "Off"
+
+#. Key:	SwitchState_WithPriority
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4612)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4612)
+msgid ",SwitchState_WithPriority"
+msgstr "Now: {0}　limit priority {1}"
+
+#. Key:	SwitchState_NoLimiter
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4618)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4618)
+msgid ",SwitchState_NoLimiter"
+msgstr "Now: {0}　never auto-limits"
+
+#. Key:	SwitchState_Plain
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4624)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4624)
+msgid ",SwitchState_Plain"
+msgstr "Now: {0}"
+
+#. Key:	Btn_SwitchOff
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4638)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4638)
+msgid ",Btn_SwitchOff"
+msgstr "Turn off"
+
+#. Key:	Header_PrioritySwitch
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4660)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4660)
+msgid ",Header_PrioritySwitch"
+msgstr "Power Switch · Priority Switch"
+
+#. Key:	Status_TeleportedTo
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4693)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4693)
+msgid ",Status_TeleportedTo"
+msgstr "已传送到 {0}"
+
+#. Key:	Target_Generic
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4695)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4695)
+msgid ",Target_Generic"
+msgstr "目标"
+
+#. Key:	Status_TeleportNoSafeLanding
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4702)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4702)
+msgid ",Status_TeleportNoSafeLanding"
+msgstr "传送已取消：目标附近没有可站立的地面（该区域尚未加载，例如溶洞深处），请先靠近后再传送"
+
+#. Key:	Status_TeleportFailed
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4707)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4707)
+msgid ",Status_TeleportFailed"
+msgstr "传送失败：目标已失效"
+
+#. Key:	Col_Header
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4992)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(4992)
+msgid ",Col_Header"
+msgstr "收集品"
+
+#. Key:	Col_RegionUnknown
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(5018)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(5018)
+msgid ",Col_RegionUnknown"
+msgstr "未知区域"
+
+#. Key:	Col_SelectedDistance
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(5070)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(5070)
+msgid ",Col_SelectedDistance"
+msgstr "Selected: {0}   {1} km away"
+
+#. Key:	Col_PickToTeleport
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(5082)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(5082)
+msgid ",Col_PickToTeleport"
+msgstr "Pick an alien-energy target to teleport to"
+
+#. Key:	Title
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(530)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(530)
+msgid ",Title"
+msgstr "智能工厂 · 终端面板"
+
+#. Key:	Status_Scanning
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(545)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(545)
+msgid ",Status_Scanning"
+msgstr "Scanning…"
+
+#. Key:	Power_Reading
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(586)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(586)
+msgid ",Power_Reading"
+msgstr "Power  reading…"
+
+#. Key:	SearchHintLocal
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(619)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(619)
+msgid ",SearchHintLocal"
+msgstr "搜索当前列表…"
+
+#. Key:	SearchTipLocal
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(620)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(620)
+msgid ",SearchTipLocal"
+msgstr "只过滤当前子类目列表内的条目；每个类目各记一份关键词"
+
+#. Key:	Detail_NoMachine
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(839)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(839)
+msgid ",Detail_NoMachine"
+msgstr "No machine selected"
+
+#. Key:	Btn_OpenMachinePanel
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(857)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(857)
+msgid ",Btn_OpenMachinePanel"
+msgstr "Open machine panel"
+
+#. Key:	Btn_PullOutput
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(864)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(864)
+msgid ",Btn_PullOutput"
+msgstr "Take output"
+
+#. Key:	Btn_TeleportToMachine
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(871)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(871)
+msgid ",Btn_TeleportToMachine"
+msgstr "Teleport to this machine"
+
+#. Key:	Header_Switch
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(888)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(888)
+msgid ",Header_Switch"
+msgstr "Power Switch"
+
+#. Key:	Btn_SwitchOn
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(903)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(903)
+msgid ",Btn_SwitchOn"
+msgstr "Turn on"
+
+#. Key:	Btn_PriorityDown
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(917)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(917)
+msgid ",Btn_PriorityDown"
+msgstr "Priority -"
+
+#. Key:	Btn_NoAutoLimit
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(925)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(925)
+msgid ",Btn_NoAutoLimit"
+msgstr "Never auto-limit"
+
+#. Key:	Btn_PriorityUp
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(933)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryPanelWidget.cpp(933)
+msgid ",Btn_PriorityUp"
+msgstr "Priority +"
+
+#. Key:	Crate_DeathCrate
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1827)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1827)
+msgid ",Crate_DeathCrate"
+msgstr "死亡箱子"
+
 #. Key:	Reason_NoPlayerController
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1171)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1171)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4156)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4156)
 msgid ",Reason_NoPlayerController"
 msgstr "Could not find the player controller."
 
 #. Key:	Reason_ViewerReadOnly
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1183)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1183)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4168)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4168)
 msgid ",Reason_ViewerReadOnly"
 msgstr "Only the console host can make changes (you are in view-only mode)."
 
 #. Key:	Msg_NotASwitch
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1205)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1205)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4190)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4190)
 msgid ",Msg_NotASwitch"
 msgstr "Target is not a power switch."
 
 #. Key:	Msg_SwitchNotWired
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1222)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1222)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4207)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4207)
 msgid ",Msg_SwitchNotWired"
 msgstr "The switch is not wired on both ends, so this has no effect."
 
 #. Key:	Msg_SwitchedOff
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1230)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1230)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4215)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4215)
 msgid ",Msg_SwitchedOff"
 msgstr "Switched off"
 
 #. Key:	Msg_SwitchedOn
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1230)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1230)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4215)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4215)
 msgid ",Msg_SwitchedOn"
 msgstr "Switched on"
 
 #. Key:	Msg_NoPrioritySupport
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1248)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1248)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4233)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4233)
 msgid ",Msg_NoPrioritySupport"
 msgstr "This switch has no power-limit priority."
 
 #. Key:	Msg_PrioritySet
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1265)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1265)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4250)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4250)
 msgid ",Msg_PrioritySet"
 msgstr "Priority set to {0}"
 
 #. Key:	Msg_NoAutoLimit
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1266)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(1266)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4251)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(4251)
 msgid ",Msg_NoAutoLimit"
 msgstr "Set to never auto-limit"
 
-#. Key:	Machine_Unknown
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(239)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(239)
-msgid ",Machine_Unknown"
-msgstr "<unknown>"
-
-#. Key:	Switch_NotWired
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(355)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(355)
-msgid ",Switch_NotWired"
-msgstr "Not wired"
-
-#. Key:	Switch_StateWithPriority
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(364)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(364)
-msgid ",Switch_StateWithPriority"
-msgstr "{0} · Priority {1}"
-
-#. Key:	Switch_StateNoLimiter
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(370)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(370)
-msgid ",Switch_StateNoLimiter"
-msgstr "{0} · No auto-limit"
-
-#. Key:	Status_Battery
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(386)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(386)
-msgid ",Status_Battery"
-msgstr "{0} / {1} MWh stored"
-
-#. Key:	Status_Storage
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(403)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(403)
-msgid ",Status_Storage"
-msgstr "{0} slots · {1} stored"
-
-#. Key:	Status_Boost
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(414)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(414)
-msgid ",Status_Boost"
-msgstr "Output x{0}"
-
-#. Key:	Status_OutputCount
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(637)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(637)
-msgid ",Status_OutputCount"
-msgstr "{0} items"
-
-#. Key:	Status_OutputItem
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(638)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(638)
-msgid ",Status_OutputItem"
-msgstr "{0} x{1}"
-
-#. Key:	Status_Empty
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(643)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(643)
-msgid ",Status_Empty"
-msgstr "Empty"
-
-#. Key:	Status_Interactive
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(648)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(648)
-msgid ",Status_Interactive"
-msgstr "Interactive"
-
-#. Key:	Status_NoPanel
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(649)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(649)
-msgid ",Status_NoPanel"
-msgstr "No panel"
-
-#. Key:	Col_DropPodUnopened
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(756)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(756)
-msgid ",Col_DropPodUnopened"
-msgstr "Drop Pod (unopened)"
-
-#. Key:	PodCost_Item
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(766)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(766)
-msgid ",PodCost_Item"
-msgstr "开启材料：{0} × {1}"
-
-#. Key:	PodCost_Power
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(773)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRCO.cpp(773)
-msgid ",PodCost_Power"
-msgstr "开启电力：{0} MW"
-
 #. Key:	Desc_Remote_Factory
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRegistry.cpp(147)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRegistry.cpp(147)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRegistry.cpp(153)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRegistry.cpp(153)
 msgid ",Desc_Remote_Factory"
 msgstr "A factory-wide console. Build it and press E: from your HUB you can see the output of every machine plus total factory generation and draw, open any machine's own panel remotely, and pull its output straight out."
 
 #. Key:	Milestone_Remote_Factory
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRegistry.cpp(227)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryRegistry.cpp(227)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRegistry.cpp(271)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryRegistry.cpp(271)
 msgid ",Milestone_Remote_Factory"
-msgstr "Unlocks the handheld Remote Factory and the High-Capacity Storage Unit. Equip the terminal from your inventory to browse every machine, operate them remotely, pull their output and teleport -- from anywhere in the world."
+msgstr "Unlocks the handheld Smart Factory and the High-Capacity Storage Unit. Equip the terminal from your inventory to browse every machine, operate them remotely, pull their output and teleport -- from anywhere in the world."
 
 #. Key:	Tree_Remote_Factory
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryResearchTree.cpp(907)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryResearchTree.cpp(907)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryResearchTree.cpp(910)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryResearchTree.cpp(910)
 msgid ",Tree_Remote_Factory"
-msgstr "远程工厂"
+msgstr "智能工厂"
 
 #. Key:	TreeDesc_Remote_Factory
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryResearchTree.cpp(908)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryResearchTree.cpp(908)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryResearchTree.cpp(911)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryResearchTree.cpp(911)
 msgid ",TreeDesc_Remote_Factory"
-msgstr "Research the Remote Factory's upgrade buildings level by level in the MAM. Each level costs more than the last; the matching building scales automatically."
+msgstr "Research the Smart Factory's upgrade buildings level by level in the MAM. Each level costs more than the last; the matching building scales automatically."
 
 #. Key:	Player_Unknown
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactorySharedSession.cpp(73)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactorySharedSession.cpp(73)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactorySharedSession.cpp(73)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactorySharedSession.cpp(73)
 msgid ",Player_Unknown"
 msgstr "Unknown player"
 
 #. Key:	ShopPowerShard_Name
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1039)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1039)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1249)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1249)
 msgid ",ShopPowerShard_Name"
 msgstr "Enhanced Power Shard"
 
 #. Key:	ShopPowerShard_Desc
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1040)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1040)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1250)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1250)
 msgid ",ShopPowerShard_Desc"
 msgstr "Buy an Enhanced Power Shard with FICSIT coupons. One purchase = one shard; purchase as many as you need."
 
 #. Key:	Desc_UpgradePowerStorage
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(166)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(166)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(172)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(172)
 msgid ",Desc_UpgradePowerStorage"
-msgstr "A very large battery bank (1000 MWh). Stores the grid's surplus and releases it during a shortfall -- the factory-wide total shows up in the readout at the top of the Remote Factory."
+msgstr "一座超大容量电池组（1600 MWh）。存储电网盈余、在缺电时自动释放；建成后整座工厂的蓄电总量会显示在智能工厂终端面板顶部。"
 
 #. Key:	Desc_UpgradeStorage
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(178)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(178)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(183)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(183)
 msgid ",Desc_UpgradeStorage"
-msgstr "An 8 x 12 = 96 slot container for stockpiling a whole production line's intermediates. The Remote Factory picks it up in its scan, so you can check the contents from there."
-
-#. Key:	Milestone_UpgradeStorage
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1786)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1786)
-msgid ",Milestone_UpgradeStorage"
-msgstr "远程工厂 · Super Battery"
-
-#. Key:	MilestoneDesc_UpgradeStorage
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1787)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1787)
-msgid ",MilestoneDesc_UpgradeStorage"
-msgstr "Unlocks the Super Battery (1000 MWh, 100 MW charge rate). It links up with the terminal and shows up in the terminal's machine list once built."
-
-#. Key:	Milestone_UpgradeAccelerator
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1809)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1809)
-msgid ",Milestone_UpgradeAccelerator"
-msgstr "远程工厂 · Production Accelerator"
-
-#. Key:	MilestoneDesc_UpgradeAccelerator
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1810)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(1810)
-msgid ",MilestoneDesc_UpgradeAccelerator"
-msgstr "Unlocks the Production Accelerator (up to 2.5x output, no power shards needed). It links up with the terminal and shows up in the terminal's machine list once built."
+msgstr "An 8 x 12 = 96 slot container for stockpiling a whole production line's intermediates. The Smart Factory picks it up in its scan, so you can check the contents from there."
 
 #. Key:	Desc_UpgradeCloudDownloader
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(189)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(189)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(194)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(194)
 msgid ",Desc_UpgradeCloudDownloader"
 msgstr "The other half of the cloud storage system: pulls items back OUT of the central pool into its own buffer, one stack at a time. Open it like any storage container and grab what you need."
 
+#. Key:	Milestone_UpgradeStorage
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(2007)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(2007)
+msgid ",Milestone_UpgradeStorage"
+msgstr "智能工厂 · 超级蓄电池"
+
+#. Key:	MilestoneDesc_UpgradeStorage
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(2008)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(2008)
+msgid ",MilestoneDesc_UpgradeStorage"
+msgstr "解锁超级蓄电池（1600 MWh，充/放 400 MW）。接入电网即可存储全网盈余、在缺电时自动释放；建成后整座工厂的蓄电总量会显示在智能工厂终端面板顶部。"
+
+#. Key:	Milestone_UpgradeAccelerator
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(2032)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(2032)
+msgid ",Milestone_UpgradeAccelerator"
+msgstr "智能工厂 · Production Accelerator"
+
+#. Key:	MilestoneDesc_UpgradeAccelerator
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(2033)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(2033)
+msgid ",MilestoneDesc_UpgradeAccelerator"
+msgstr "Unlocks the Production Accelerator (up to 2.5x output, no power shards needed). It links up with the terminal and shows up in the terminal's machine list once built."
+
 #. Key:	Desc_UpgradeCloudFluidUploader
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(201)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(201)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(206)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(206)
 msgid ",Desc_UpgradeCloudFluidUploader"
 msgstr "Attach a pipe and every cubic meter that arrives is uploaded into the cloud pool as its own fluid entry -- liquids and gases are accounted separately from solid items."
 
+#. Key:	Milestone_UpgradePowerShard
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(2066)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(2066)
+msgid ",Milestone_UpgradePowerShard"
+msgstr "智能工厂 · 强化能量碎片"
+
+#. Key:	MilestoneDesc_UpgradePowerShard
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(2067)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(2067)
+msgid ",MilestoneDesc_UpgradePowerShard"
+msgstr "解锁强化能量碎片的三种制造方式：构造机（2 块能量碎片 → 1 块）、量子编码器（合成能量碎片的全部材料翻倍 → 1 块）、制作台（2 块能量碎片手搓 1 块，6 秒）。强化碎片插进机器碎片槽后每块 +100% 超频，机器上限 500%（受槽位数限制，1 块 200% / 2 块 300% / 3 块 400% / 4 块 500%），耗电按原版越级曲线自动上涨。"
+
 #. Key:	Desc_UpgradeCloudFluidDownloader
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(212)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(212)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(217)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(217)
 msgid ",Desc_UpgradeCloudFluidDownloader"
 msgstr "Press E to pick which fluid the cloud should send back out, then attach a pipe: the station feeds the selected fluid into the network as long as the cloud holds stock."
 
 #. Key:	Shard_Name
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(263)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(263)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(281)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(281)
 msgid ",Shard_Name"
 msgstr "Enhanced Power Shard"
 
 #. Key:	Shard_Desc
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(314)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(314)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(332)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(332)
 msgid ",Shard_Desc"
 msgstr "A refined shard for the vanilla shard slots. It overclocks exactly like a vanilla shard, but packs more potential per slot -- and the machines' potential ceiling rises with your MAM research (up to 400%: 3 shards = 1 + 3 x 1.0). Power draw follows the vanilla curve, so high overclocks burn coal fast."
 
 #. Key:	Desc_UpgradeAccelerator
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(326)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(326)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(344)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeRegistry.cpp(344)
 msgid ",Desc_UpgradeAccelerator"
 msgstr "Needs no power shards: once powered it applies a long-lasting production multiplier to itself. Capped at 2.5x -- beyond that the power draw outgrows the output and you are better off building another machine."
 
 #. Key:	Track_Storage
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(151)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(151)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(152)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(152)
 msgid ",Track_Storage"
 msgstr "Cloud Capacity"
 
 #. Key:	Track_PowerStorage
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(152)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(152)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(153)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(153)
 msgid ",Track_PowerStorage"
 msgstr "Super Battery"
 
 #. Key:	Track_PowerShard
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(153)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(153)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(154)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(154)
 msgid ",Track_PowerShard"
 msgstr "Enhanced Power Shard"
 
 #. Key:	ResearchNodeNameFmt
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(165)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(165)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(166)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(166)
 msgid ",ResearchNodeNameFmt"
 msgstr "{0} {1}"
 
 #. Key:	Route_FinalBoost
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(174)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(174)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(175)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(175)
 msgid ",Route_FinalBoost"
 msgstr "Final Reinforcement · Shard"
 
 #. Key:	Route_FinalPlain
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(175)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(175)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(176)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(176)
 msgid ",Route_FinalPlain"
 msgstr "Final Reinforcement · Standard"
 
 #. Key:	RewardDescFinalBoost
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(190)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(190)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(192)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(192)
 msgid ",RewardDescFinalBoost"
 msgstr "Final reinforcement (shard route): all three tracks advance together. Each level additionally consumes Enhanced Power Shards and grants a 1.5x effect."
 
 #. Key:	RewardDescFinalPlain
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(193)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(193)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(195)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(195)
 msgid ",RewardDescFinalPlain"
 msgstr "Final reinforcement (standard route): all three tracks advance together along the original curve. Consumes no power shards."
 
+#. Key:	RewardDescCapacityFixed
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(216)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(216)
+msgid ",RewardDescCapacityFixed"
+msgstr "Cloud capacity: the central pool holds {0} stacks per item type and is not raised by research yet. The pool is shared by all four stations -- the solid upload station, the fluid upload station, the solid download station and the fluid download station."
+
 #. Key:	RewardDescCapacity
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(204)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(204)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(228)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(228)
 msgid ",RewardDescCapacity"
-msgstr "Cloud capacity: the central pool now holds {0} stacks per item type (this level +2). The pool is shared by all four stations -- the solid upload station, the fluid upload station, the solid download station and the fluid download station."
+msgstr "Cloud capacity: the central pool now holds {0} stacks per item type (capacity factor {1}x). The pool is shared by all four stations -- the solid upload station, the fluid upload station, the solid download station and the fluid download station."
 
 #. Key:	RewardDescBattery
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(212)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(212)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(236)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(236)
 msgid ",RewardDescBattery"
 msgstr "Super battery: each level raises the battery's stored energy and its charge rate by 25%. Batteries link up into one grid-wide buffer."
 
 #. Key:	RewardDescShard
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(216)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(216)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(240)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(240)
 msgid ",RewardDescShard"
 msgstr "Enhanced power shard: each stage raises every machine's shard-slot potential ceiling (250% -> 300% -> 350% -> 400%) together with the per-shard increment. Power draw still follows the vanilla curve."
 
 #. Key:	ResearchDisplayNameFmt
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(428)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(428)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(452)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgradeResearch.cpp(452)
 msgid ",ResearchDisplayNameFmt"
 msgstr "{0} · Lv{1}"
 
 #. Key:	Upgrade_PowerStorage
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(1484)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(1484)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(1478)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(1478)
 msgid ",Upgrade_PowerStorage"
 msgstr "Power Storage Unit"
 
 #. Key:	Upgrade_Storage
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(1708)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(1708)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(1844)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(1844)
 msgid ",Upgrade_Storage"
 msgstr "Cloud Storage Upload Station"
 
 #. Key:	Upgrade_CloudDownloader
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(1952)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(1952)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(2179)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(2179)
 msgid ",Upgrade_CloudDownloader"
 msgstr "Cloud Storage Download Station"
 
 #. Key:	Upgrade_CloudFluidUploader
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(2114)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(2114)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(2344)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(2344)
 msgid ",Upgrade_CloudFluidUploader"
 msgstr "Cloud Fluid Upload Station"
 
 #. Key:	Upgrade_CloudFluidDownloader
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(2328)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(2328)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(2561)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(2561)
 msgid ",Upgrade_CloudFluidDownloader"
 msgstr "Cloud Fluid Download Station"
 
 #. Key:	Upgrade_Accelerator
-#. SourceLocation:	Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(2372)
-#: Mods/Remote_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(2372)
+#. SourceLocation:	Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(2609)
+#: Mods/Smart_Factory/Source/Remote_Factory/Remote_FactoryUpgrades.cpp(2609)
 msgid ",Upgrade_Accelerator"
 msgstr "Production Accelerator"
 

@@ -49,6 +49,7 @@ public:
     virtual bool IsValidHitResult(const FHitResult& hitResult) const override;
     virtual bool TrySnapToActor(const FHitResult& hitResult) override;
     virtual void GetIgnoredClearanceActors(TSet<AActor*>& ignoredActors) const override;
+
 };
 
 UCLASS()
@@ -62,6 +63,7 @@ public:
     virtual bool IsValidHitResult(const FHitResult& hitResult) const override;
     virtual bool TrySnapToActor(const FHitResult& hitResult) override;
     virtual void GetIgnoredClearanceActors(TSet<AActor*>& ignoredActors) const override;
+
 };
 
 UCLASS()
@@ -75,6 +77,7 @@ public:
     virtual bool IsValidHitResult(const FHitResult& hitResult) const override;
     virtual bool TrySnapToActor(const FHitResult& hitResult) override;
     virtual void GetIgnoredClearanceActors(TSet<AActor*>& ignoredActors) const override;
+
 };
 
 UCLASS()
@@ -88,7 +91,10 @@ public:
     virtual bool IsValidHitResult(const FHitResult& hitResult) const override;
     virtual bool TrySnapToActor(const FHitResult& hitResult) override;
     virtual void GetIgnoredClearanceActors(TSet<AActor*>& ignoredActors) const override;
+
 };
+
+
 
 UCLASS()
 class REMOTE_FACTORY_API AWTUpgradeAcceleratorHologram : public AFGBuildableHologram

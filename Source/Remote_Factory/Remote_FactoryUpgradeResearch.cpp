@@ -1,6 +1,8 @@
 #include "Remote_FactoryUpgradeResearch.h"
 
 #include "Remote_FactoryUpgradeRegistry.h"   // WT_ApplySchematicIcon / recipe classes
+#include "Remote_FactoryRegistry.h"          // ★URemote_FactoryMilestone（前置条件文案要引用它的类）
+#include "Remote_FactoryCloudQuota.h"         // ★1.0.7 云端配额等级系数（基线 + 每级倍数）
 #include "Unlocks/FGUnlockInfoOnly.h"          // ★0.2.43 奖励区「文字行」= BP_UnlockInfoOnly_C（其基类）
 #include "UObject/TextProperty.h"              // FTextProperty（反射写 mUnlockName/mUnlockDescription）
 #include "Engine/Texture2D.h"                  // mUnlockIconBig/Small 写的是 UTexture2D*
@@ -10,6 +12,9 @@
 #include "FGSchematicCategory.h"
 #include "FGSchematic.h"
 #include "AvailabilityDependencies/FGSchematicPurchasedDependency.h"
+#include "Kismet/GameplayStatics.h"          // ★2026-11-07 显式发碎片：UGameplayStatics::GetPlayerController
+#include "FGCharacterPlayer.h"                // ★2026-11-07 AFGCharacterPlayer::GetInventory()
+#include "FGInventoryComponent.h"             // ★2026-11-07 FInventoryStack / AddStack（发碎片到背包）
 
 // ================================================================================================
 // 成本表（2026-10-07 重构：5 阶段 x 3 轨 x 3 材料 = 39 项，全树不重复）
@@ -106,6 +111,108 @@ static const int32 GStageBaseAmount[5][3] = {
 /** 阶段内第 1~4 级的数量倍率（第 4 级 = 前两级之和）。 */
 static const int32 GLevelMult[4] = { 1, 2, 4, 6 };
 
+/** §6.6 ③ 强化能量碎片补偿发放逐级表：Lv1~16 随研究一次性发放（单位 = 我们的强化能量碎片
+ *  UWTUpgradePowerShardDescriptor，非原版 Desc_CrystalShard）。合计 1602，与设计表 §6.6 ③ 逐行一致。
+ *  同时供奖励区文案 WTRewardDescription 引用以写明每级补偿数量。 */
+static const int32 GShardGrant[16] = {
+    36,  38,  38,  40,    // Ⅰ LV1~4   = 154（Lv1 经 Clamp 取 38，非 36）
+    62,  65,  66,  68,    // Ⅱ LV5~8   = 261
+    105, 108, 111, 112,   // Ⅲ LV9~12  = 436
+    180, 185, 190, 196    // Ⅳ LV13~16 = 751（Lv1~16 合计 1602）
+};
+
+// 碎片补偿表：Lv1 经 WT_ShardGrantAt 的 Clamp(Lv,2,16)-1 取 index1 ⇒ 发 38（与旧 Lv2 同值，但机制是 Clamp 而非前移数组）。
+// 集中管理，三处引用点（文案/奖励名/发放）共用，避免三份漂移。
+static FORCEINLINE int32 WT_ShardGrantAt(int32 Level)
+{
+    return GShardGrant[FMath::Clamp(Level, 2, 16) - 1];
+}
+
+// ★2026-11-07 强化碎片补偿：改为「研究完成时显式发放」。
+//   UFGUnlockGiveItem 在 MAM 路径下只是容器（SDK 头注释 "Doesn't actually do anything on unlock"），
+//   研究系统不会读它来发物品 ⇒ 光把 mGrantUnlock 塞进 mUnlocks 进不了背包。改为登记
+//   「schematic 类 → 发放量」，由 WT_GivePendingShardCompensation 在研究完成时 AddStack 到玩家背包。
+static TMap<UClass*, int32> GWTShardGrantBySchematic;   // 注册表：schematic 类 → 当级发放量
+static TSet<UClass*>        GWTShardGranted;            // 已发放集合（幂等去重）
+
+void WT_RegisterShardGrant(UClass* SchematicClass, int32 Amount)
+{
+    if (SchematicClass && Amount > 0)
+    {
+        GWTShardGrantBySchematic.Add(SchematicClass, Amount);
+    }
+}
+
+// 把碎片加进玩家主背包（即用户说的「背包」）。AddStack 为 server-only，研究完成在服务器侧触发，安全。
+static void WT_GiveShardsToPlayer(UWorld* W, int32 Amount)
+{
+    if (!W || Amount <= 0)
+    {
+        return;
+    }
+    APlayerController* PC = UGameplayStatics::GetPlayerController(W, 0);
+    AFGCharacterPlayer* Char = (PC && PC->GetCharacter()) ? Cast<AFGCharacterPlayer>(PC->GetCharacter()) : nullptr;
+    UFGInventoryComponent* Inv = Char ? Char->GetInventory() : nullptr;
+    if (!Inv)
+    {
+        WT_WARNF(TEXT("[wt-shard] player backpack unavailable; %d shards NOT granted (retry on next completion)."), Amount);
+        return;
+    }
+    FInventoryStack Stack(Amount, TSubclassOf<UFGItemDescriptor>(UWTUpgradePowerShardDescriptor::StaticClass()));
+    const int32 Added = Inv->AddStack(Stack, /*allowPartialAdd=*/true);
+    WT_WARNF(TEXT("[wt-shard] granted %d enhanced power shards (added %d to backpack)."), Amount, Added);
+}
+
+// 研究完成时调用：把「已购买、尚未发放」的碎片轨 schematic 对应碎片发到背包。幂等（GWTShardGranted 去重）。
+// ★2026-11-07 修复「LV1 没有、LV2 起才有」错位：研究完成事件触发时，SchematicManager 的「已购集合」
+//   往往还没提交完**刚那一级**的购买，导致 IsSchematicPurchased(本级) 当次返回 false → 本级补偿被漏掉，
+//   要等下一级完成时（那时本级已提交）才补发，呈现错位一级。故对 JustCompleted（本次刚研究完的
+//   schematic，此刻 100% 已购）**直接发放、跳过 IsSchematicPurchased 判定**；循环仅作跨会话兜底。
+void WT_GivePendingShardCompensation(UWorld* W, UClass* JustCompleted)
+{
+    if (!W || GWTShardGrantBySchematic.Num() == 0)
+    {
+        return;
+    }
+    const AFGSchematicManager* SM = AFGSchematicManager::Get(W);
+    if (!SM)
+    {
+        return;
+    }
+    auto TryGrant = [&](UClass* Key)
+    {
+        if (!Key)
+        {
+            return;
+        }
+        const int32* pAmt = GWTShardGrantBySchematic.Find(Key);
+        if (!pAmt || GWTShardGranted.Contains(Key))
+        {
+            return;
+        }
+        WT_GiveShardsToPlayer(W, *pAmt);
+        GWTShardGranted.Add(Key);
+    };
+    // ① 先发「刚研究完」这一级（绕过 IsSchematicPurchased 时序窗口）。
+    if (JustCompleted)
+    {
+        TryGrant(JustCompleted);
+    }
+    // ② 再补发所有「已购但未发」的（跨会话 / 延迟补偿兜底）。
+    for (const TPair<UClass*, int32>& E : GWTShardGrantBySchematic)
+    {
+        if (GWTShardGranted.Contains(E.Key))
+        {
+            continue;
+        }
+        if (SM->IsSchematicPurchased(E.Key))
+        {
+            WT_GiveShardsToPlayer(W, E.Value);
+            GWTShardGranted.Add(E.Key);
+        }
+    }
+}
+
 /**
  * ★0.2.36f 研究耗时（用户定案）：按**层级**递增，每层 +30 秒。
  *
@@ -131,6 +238,15 @@ constexpr float WT_FinalResearchSecondsBoost = 180.f;
  * 不再走资产路径解析。
  */
 
+/** 储能单元（Super Battery）奖励区文案基数：必须与 AWTUpgradePowerStorage 本体一致。
+ *  储电量基数 1600 MWh（BeginPlay 乘 WT_TrackScale，前移一级 ⇒ Lv1 研究后 = 2000 MWh）。
+ *  ★充电速率（mPowerInputCapacity）2026-11-07 定案改为「按里程碑档位固定上限」，不再乘 WT_TrackScale；
+ *   具体数值见 WT_PowerStorageChargeCapMW（Lv1~4=200 / 5~8=500 / 9~12=1000 / 13~16=2500 / 17~20=5000 MW），
+ *   与建筑本体共用，故此处不再保留 400 基类常量。 */
+static constexpr float GPowerStorageBaseMWh = 1600.f;
+// 前向声明：定义见下方 WT_TrackScale（与建筑缩放用同一函数，保证文案 = 实际值，不漂移）。
+float WT_TrackScale(EWTUpgradeTrack Track, int32 Level, EWTFinalRoute Route);
+
 /** 阶段 1 的入口门禁：本模组自己的 T1 里程碑（先有终端，才有升级研究）。 */
 static const TCHAR* GEntryMilestonePath =
     TEXT("/Script/Remote_Factory.Remote_FactoryMilestone");
@@ -148,9 +264,9 @@ static FText WTTrackDisplayName(int32 ti)
 {
     switch (ti)
     {
-    case 0:  return WT_LOCTEXT("Track_Storage",      "Cloud Capacity");
-    case 1:  return WT_LOCTEXT("Track_PowerStorage", "Super Battery");
-    default: return WT_LOCTEXT("Track_PowerShard",   "Enhanced Power Shard");
+    case 0:  return WT_LOCTEXT("Track_Storage",      "大容量仓库");
+    case 1:  return WT_LOCTEXT("Track_PowerStorage", "储能单元");
+    default: return WT_LOCTEXT("Track_PowerShard",   "强化能量碎片");
     }
 }
 
@@ -170,15 +286,16 @@ static FText WTTrackNodeName(int32 ti, int32 Stage)
 /** 末段两条路线的名字。 */
 static FText WTRouteDisplayName(EWTFinalRoute Route)
 {
-    return (Route == EWTFinalRoute::Boost)
-        ? WT_LOCTEXT("Route_FinalBoost", "Final Reinforcement · Shard")
-        : WT_LOCTEXT("Route_FinalPlain", "Final Reinforcement · Standard");
+    if (Route == EWTFinalRoute::Boost)
+        return WT_LOCTEXT("Route_FinalBoost", "最终强化 · 碎片");
+    return WT_LOCTEXT("Route_FinalPlain", "最终强化 · 常规");
 }
 
 /**
  * ★0.2.36h（用户定案「奖励区，写说明和物品」）：每个节点在奖励区的**说明文字**。
  *
- * 数字只写能在代码/设计表里核实的：云端容量 = 2×Lv（末段碎片路线 = 3×Lv-16，即每级再 +1）。
+ * 数字只写能在代码里核实的：云端容量由 Remote_FactoryCloudQuota::TargetStacks(Level) 算出
+ *（1.0.7 起改成等级系数 —— 基线 10 组 × (1.0 / 1.1 / 1.2 …)，末段碎片路线每级再 +0.1）。
  * ★第一条轨的说明必须把**四类站**都点名列出（用户 2026-10-07：「图一需要固体，液体，上传，
  * 下载都含进去」）—— 云端池是四类站共享的，只提固体上传站会误导。
  */
@@ -186,55 +303,165 @@ static FText WTRewardDescription(int32 ti, int32 Level, bool bFinal, EWTFinalRou
 {
     if (bFinal)
     {
-        return (Route == EWTFinalRoute::Boost)
-            ? WT_LOCTEXT("RewardDescFinalBoost",
-                "Final reinforcement (shard route): all three tracks advance together. Each level "
-                "additionally consumes Enhanced Power Shards and grants a 1.5x effect.")
-            : WT_LOCTEXT("RewardDescFinalPlain",
-                "Final reinforcement (standard route): all three tracks advance together along the "
-                "original curve. Consumes no power shards.");
+        FText Body;
+        if (Route == EWTFinalRoute::Boost)
+        {
+            // ★第5层（阶段5 / 末段 Lv17~20）「强化路线」（碎片路线）的额外门槛：
+            //   消耗的强化能量碎片 = 我们的 UWTUpgradePowerShardDescriptor，**不是**原版 Desc_CrystalShard；
+            //   与 Lv1~16 补偿发放的是同一枚 mod 物品。数量 = 50 × GLevelMult[段内级-1]，
+            //   与 Apply() 末段成本、设计表 §6.6 ④ / 节点14 的 50/100/200/300（合计 650）一致。
+            const int32 ShardCost = 50 * GLevelMult[FMath::Clamp(Level - WT_Stage4MaxLevel, 1, 4) - 1];
+            Body = FText::Format(
+                WT_LOCTEXT("RewardDescFinalBoost",
+                    "终段强化（碎片路线）：三条轨同时推进，效果为 1.5 倍。本等级额外消耗 {0} 片强化能量碎片——"
+                    "即本模组的碎片（非原版能量碎片），与 Lv1~16 补偿发放的是同一枚物品。"
+                    "消耗节奏：Lv17/18/19/20 分别为 50/100/200/300 片（合计 650 片）。"),
+                FText::AsNumber(ShardCost));
+        }
+        else
+        {
+            Body = WT_LOCTEXT("RewardDescFinalPlain",
+                "终段强化（常规路线）：三条轨沿原曲线同时推进。不消耗任何能量碎片。");
+        }
+        // ★LV17 一次性选择警示（用户要求：三条轨完成后、LV17 二选一前给予提示，防误触）
+        if (Level == WT_FinalMinLevel)
+        {
+            const FText Warn = WT_LOCTEXT("RewardDescFinalWarn",
+                "⚠ 重要：这是末段路线的「一次性最终选择」。选定后，Lv18~Lv20 将整段跟随本路线，"
+                "且无法再切换到另一条（另一条会被永久锁定）。请确认后再研究。");
+            return FText::Format(WT_LOCTEXT("RewardDescFinalWarnFmt", "{0}\n\n{1}"), Warn, Body);
+        }
+        return Body;
     }
 
     switch (ti)
     {
     case 0:
     {
-        const int32 Stacks = 2 * Level;   // 每级 +2 组；末段碎片路线再每级 +1（3×Lv-16）
+        // ★1.0.7 容量改按等级系数（Lv2 = ×1.1、Lv3 = ×1.2 …）：文案直接给出「目标组数 + 倍数」。
+        //   原版那句 "this level +2" 在新口径下已经不成立（Lv1 是 +0、末段碎片是 +2），
+        //   写死增量必然说谎。bFinal 在上面已经提前 return，这里恒为非末段。
+        const int32 Stacks = Remote_FactoryCloudQuota::TargetStacks(Level, /*bShard=*/false);
+
+        // ★★★1.0.7 用户定案「MAM 现在不加上去」：总闸关着 ⇒ 每一级都不涨容量。
+        //   此时绝不能沿用下面「容量系数 1.0 倍」那句（会读成「研究有收益但倍数是 1」），
+        //   直接明说「固定 N 组、本阶段不随研究提升」—— 数字仍取自同一个 TargetStacks，
+        //   与 unlock 段天然一致（闸开/闸关都不会出现文案和实际值不符）。
+        if (!Remote_FactoryCloudQuota::WT_FEATURE_CLOUD_QUOTA_MAM)
+        {
+            return FText::Format(
+                WT_LOCTEXT("RewardDescCapacityFixed",
+                    "云端容量：中央仓库每个物品类型暂存 {0} 组，且暂不随研究提升。该仓库由四类站点共享——"
+                    "固体上传站、流体上传站、固体下载站与流体下载站。"),
+                FText::AsNumber(Stacks));
+        }
+
+        const int32 Percent = Remote_FactoryCloudQuota::FactorPercent(Level, /*bShard=*/false);
+        const FText Factor  = FText::FromString(FString::Printf(TEXT("%.1f"),
+                                  static_cast<double>(Percent) / 100.0));
         return FText::Format(
             WT_LOCTEXT("RewardDescCapacity",
-                "Cloud capacity: the central pool now holds {0} stacks per item type "
-                "(this level +2). The pool is shared by all four stations -- the solid "
-                "upload station, the fluid upload station, the solid download station "
-                "and the fluid download station."),
-            FText::AsNumber(Stacks));
+                "云端容量：中央仓库每个物品类型现在可存 {0} 组（容量系数 {1} 倍）。该仓库由四类站点共享——"
+                "固体上传站、流体上传站、固体下载站与流体下载站。你已放置的上传站与下载站会在研究完成后"
+                "立即生效这组新容量——是实打实的提升，不只是账面数字。"),
+            FText::AsNumber(Stacks), Factor);
     }
     case 1:
-        return WT_LOCTEXT("RewardDescBattery",
-            "Super battery: each level raises the battery's stored energy and its charge "
-            "rate by 25%. Batteries link up into one grid-wide buffer.");
+    {
+        // ★储能单元（ti==1，Lv1~16 非末段）奖励区：写明每级**实际**储电量 / 充电速率上限。
+        //   储电量：基数 1600 MWh × WT_TrackScale（非末段 = 1.25^Level，前移一级 ⇒ Lv1 研究后 = 2000 MWh）。
+        //   充电速率上限：2026-11-07 定案改为「按里程碑档位固定上限」(WT_PowerStorageChargeCapMW)，
+        //   不再随等级 ×1.25 增长，避免 Lv20≈34.7GW 任何电网都供不上、标称速率成摆设。
+        const int32 MWh = WT_PowerStorageMWh(Level, EWTFinalRoute::None);
+        const int32 MW  = WT_RoundToHundred(FMath::RoundToInt(WT_PowerStorageChargeCapMW(Level)));
+        return FText::Format(
+            WT_LOCTEXT("RewardDescBattery",
+                "Super battery: researching this level raises stored energy to {0} MWh "
+                "(+25% over the previous level). The charge-rate cap follows your milestone tier and "
+                "is now {1} MW -- it stays fixed within a tier and only jumps when you reach a new "
+                "milestone tier, so it always matches the surplus power your grid can actually spare "
+                "(and never trips the grid). Batteries link up into one grid-wide buffer, and "
+                "already-placed super batteries take this new capacity the moment research finishes -- "
+                "the boost is real, not merely on paper."),
+            FText::AsNumber(MWh), FText::AsNumber(MW));
+    }
     default:
-        return WT_LOCTEXT("RewardDescShard",
-            "Enhanced power shard: each stage raises every machine's shard-slot potential "
-            "ceiling (250% -> 300% -> 350% -> 400%) together with the per-shard increment. "
-            "Power draw still follows the vanilla curve.");
+        // ★强化碎片轨（ti==2，Lv1~16）奖励区：写明「补偿的是我们的强化碎片 + 具体数量 + 最多3片」。
+        //   原版能量碎片（Desc_CrystalShard）只是 §6.6 折算基准，MAM 实际发放的是我们的
+        //   UWTUpgradePowerShardDescriptor。数量取自 §6.6 ③ 逐级表（WT_ShardGrantAt 经 Clamp(Lv,2,16)-1 取 index1，故 LV1 即发 38，前移定案）。
+        //   每台机器最多装 3 片强化碎片（沿用原版 3 插槽），超频上限 400%（1/2/3 片 = 200/300/400%）。
+        return FText::Format(
+            WT_LOCTEXT("RewardDescShard",
+                "强化能量碎片（本模组的碎片，不是原版能量碎片）：完成本研究补偿 {0} 片强化能量碎片。"
+                "每台机器最多装 3 片，超频上限 400%（1/2/3 片分别对应 200%/300%/400%）。"
+                "耗电仍沿用原版曲线。补偿到的碎片可立即装入你已放置的机器（每台最多 3 片、最高 400% 超频）——"
+                "是直接、实打实的性能提升。"),
+            FText::AsNumber(WT_ShardGrantAt(Level)));
+    }
+}
+
+/**
+ * ★2026-11-07（Bug A 修复）：奖励区只渲染 mUnlockName（BP_UnlockInfoOnly 控件不渲染 mUnlockDescription，
+ * 已实测），原「提升多少」写在描述里玩家看不到。本函数把每轨当级的**关键提升量**浓缩成后缀，
+ * 拼进奖励名（mUnlockName），使玩家在奖励区一眼看到「提升多少」。数值全部复用 WTRewardDescription
+ * 的同一来源（TargetStacks / WT_TrackScale / WT_ShardGrantAt），保证「名字写的 = 实际给的」。
+ */
+static FText WT_RewardNameBoost(int32 ti, int32 Level, bool bFinal, EWTFinalRoute Route)
+{
+    if (bFinal)
+    {
+        return FText::GetEmpty();   // 末段已在本体文案说清，名字不再追加
+    }
+    switch (ti)
+    {
+    case 0:
+    {
+        const int32 Stacks = Remote_FactoryCloudQuota::TargetStacks(Level, /*bShard=*/false);
+        const int32 Pct    = Remote_FactoryCloudQuota::FactorPercent(Level, /*bShard=*/false);
+        return FText::Format(
+            WT_LOCTEXT("BoostCap", "  (+{0}% → {1} 组)"),
+            FText::AsNumber(Pct - 100), FText::AsNumber(Stacks));
+    }
+    case 1:
+    {
+        // ★2026-11-07 修正（用户实测）：奖励名写「本级的增量」而非「绝对总量」。
+        //   LV1（建筑等级 2）相对未研究的 +400 MWh，而非显示绝对 2000 MWh。
+        // ★2026-11-07 末 #46 修正：WT_TrackScale 内部把 Level<1 钳成 1（⇒ 1.25^1），若直接传
+        //   FMath::Max(1, Level-1)，Lv1 时 Level-1=0 也被钳成 1，sPrev 与 s 同为 1.25 ⇒ 增量算成
+        //   +0 MWh（实错，应 +400）。Lv1 的「上一级」是未研究基线（1.0×），单独用 1.0 作被减数。
+        // 增量 = 本级取整后储电量 − 上一级取整后储电量（Lv1 以未研究基线 1600 为被减数），
+        // 保证「奖励名写的」与「实际加成」完全一致（名字 = 实际）。均已按百位取整。
+        const int32 MWh = WT_PowerStorageMWh(Level, EWTFinalRoute::None)
+                        - (Level <= 1 ? WT_RoundToHundred((int32)GPowerStorageBaseMWh)
+                                      : WT_PowerStorageMWh(Level - 1, EWTFinalRoute::None));
+        return FText::Format(
+            WT_LOCTEXT("BoostBatt", "  (+{0} MWh)"), FText::AsNumber(MWh));
+    }
+    default:
+    {
+        const int32 Grant = WT_ShardGrantAt(Level);
+        return FText::Format(
+            WT_LOCTEXT("BoostShard", "  (+{0} 片)"), FText::AsNumber(Grant));
+    }
     }
 }
 
 // ================================================================================================
-// ★0.2.43 奖励区「文字行」写入（反射）
+// ★0.2.43 奖励区「文字行」写入（反射）；★2026-11-05 修正目标对象
 //
-// 用户定案：MAM 奖励区要「图标在上、文字说明在下」。原版的做法（官方 Docs JSON 逐条取证）：
-//   * 文字的数据源在 **schematic 自己**身上 —— mUnlockName / mUnlockDescription / mUnlockIcon*；
-//   * 再由 mUnlocks 里一条 **BP_UnlockInfoOnly_C** 条目把它画出来。
-//     原版 **21/21 处** BP_UnlockInfoOnly_C 条目全都是裸的（只写 Class、零自定义字段）
-//     ⇒ 数据确实不在条目上，在 schematic 上。例：MAM 节点 Research_Caterium_2_C 的
-//     mUnlockName = "New Shop Products!"；Schematic_2-5_C = "Build Gun Upgrade: Customizer"。
-//   * 共 20 条原版 schematic 带非空 mUnlockName。
+// 用户定案：MAM 奖励区要「图标在上、文字说明在下」。原版的做法：
+//   * 文字/图标的**数据源在 unlock 条目自己身上** —— `UFGUnlockInfoOnly` 的
+//     mUnlockName / mUnlockDescription / mUnlockIconBig / mUnlockIconSmall；
+//   * 再把它挂进 schematic 的 `mUnlocks`，由原版蓝图把它画出来。
 //
-// ★为什么必须走反射：本项目编译用的 FGSchematic.h 桩文件里**没有**这几个字段
-//   （只有 mDisplayName/mDescription/mSchematicIcon），但运行时的 UFGSchematic 有
-//   （原版 20 个 schematic 在用；utoc 目录索引里也确有 BP_UnlockInfoOnly.uasset）。
-//   找不到就记日志、不崩。
+// ★★★旧注释（0.2.43 那版）把这两件事合成了「数据在 schematic 上」，是**错的**，已由实测推翻：
+//   连续 56 条 `[research] reward text <= 0/4 field(s) written; readback="<no mUnlockName property>"`。
+//   一手核实：`FGSchematic.h` 只有 mDisplayName(:206)/mDescription(:210)，四个 mUnlock* 全部在
+//   `Unlocks/FGUnlockInfoOnly.h:22/26/30/34`。⇒ 必须写 `BP_UnlockInfoOnly_C` 实例（见 WT_ApplyRewardText）。
+//
+// ★为什么走反射而不是直接成员访问：这四个字段在 C++ 里是 protected，且它们既不在本项目
+//   编译用的 FGSchematic.h 桩里、也不属于已拿到友谊的 UFGSchematic/UFGUnlockRecipe。
+//   反射按名找 UPROPERTY，命中即可写；找不到就记日志、不崩（不阻断整棵树的装配）。
 // ================================================================================================
 /** 写 FText 属性。FTextProperty 继承 TProperty<FText,FProperty>，**没有** FText 专属的
  *  SetPropertyValue 重载（引擎 TextProperty.h 实测），所以直接对容器地址上的 FText 对象赋值。 */
@@ -270,35 +497,48 @@ static bool WT_SetRewardObjectProp(UObject* Obj, const TCHAR* PropName, UObject*
     return true;
 }
 
-/** 把「奖励区文字」写到 schematic 自己身上，并回读一条日志 —— 下一轮实测就靠它判定
- *  「字段存在且写进去了」还是「运行时根本没有这个字段（反射没命中）」。 */
-static void WT_ApplyRewardText(UFGSchematic* Self, const FText& Name, const FText& Desc, UTexture2D* Icon)
+/** 把「奖励区文字」写到 **UFGUnlockInfoOnly 实例**上，并回读一条日志。
+ *
+ * ★★★2026-11-05 实测纠错（原写法的目标对象从一开始就是错的）：
+ *   旧代码把目标写成 `this`（schematic），日志连续 56 条
+ *     `[research] reward text <= 0/4 field(s) written; readback="<no mUnlockName property>"`
+ *   —— 一个字段都没写进去。
+ *   一手核实（SDK 头逐条）：
+ *     · `FGSchematic.h` 的 UFGSchematic 只有 `mDisplayName`(:206) / `mDescription`(:210)，
+ *       **没有** mUnlockName / mUnlockDescription / mUnlockIconBig / mUnlockIconSmall；
+ *     · 这四个字段真正的主人是 `Unlocks/FGUnlockInfoOnly.h:22/26/30/34`
+ *       的 **UFGUnlockInfoOnly**（UFGUnlock 子类，Blueprintable/abstract）。
+ *   ⇒ 文字/图标必须写在 `mUnlocks` 里那条 `BP_UnlockInfoOnly_C` 的**实例**上，写 schematic 永远 0/4。
+ *
+ * 反射仍是唯一通路：四个字段在 C++ 里是 protected，且我们不想再开 AccessTransformer 友谊。
+ * 它们都是 UPROPERTY ⇒ `FindPropertyByName` 在**实例**上照样命中。 */
+static void WT_ApplyRewardText(UObject* Target, const FText& Name, const FText& Desc, UTexture2D* Icon)
 {
-    if (!Self)
+    if (!Target)
     {
         return;
     }
     int32 Written = 0;
-    Written += WT_SetRewardTextProp(Self, TEXT("mUnlockName"), Name) ? 1 : 0;
-    Written += WT_SetRewardTextProp(Self, TEXT("mUnlockDescription"), Desc) ? 1 : 0;
+    Written += WT_SetRewardTextProp(Target, TEXT("mUnlockName"), Name) ? 1 : 0;
+    Written += WT_SetRewardTextProp(Target, TEXT("mUnlockDescription"), Desc) ? 1 : 0;
     if (Icon)
     {
-        Written += WT_SetRewardObjectProp(Self, TEXT("mUnlockIconBig"), Icon) ? 1 : 0;
-        Written += WT_SetRewardObjectProp(Self, TEXT("mUnlockIconSmall"), Icon) ? 1 : 0;
+        Written += WT_SetRewardObjectProp(Target, TEXT("mUnlockIconBig"), Icon) ? 1 : 0;
+        Written += WT_SetRewardObjectProp(Target, TEXT("mUnlockIconSmall"), Icon) ? 1 : 0;
     }
 
     FString ReadBack = TEXT("<no mUnlockName property>");
     if (FTextProperty* P =
-            CastField<FTextProperty>(Self->GetClass()->FindPropertyByName(TEXT("mUnlockName"))))
+            CastField<FTextProperty>(Target->GetClass()->FindPropertyByName(TEXT("mUnlockName"))))
     {
-        const FText* Addr = static_cast<const FText*>(P->ContainerPtrToValuePtr<void>(Self));
+        const FText* Addr = static_cast<const FText*>(P->ContainerPtrToValuePtr<void>(Target));
         ReadBack = Addr ? Addr->ToString() : TEXT("<null>");
     }
 
-    WT_WARNF_ONCE(TEXT("reward-text"), Self,
-        TEXT("[research] reward text <= %d/4 field(s) written "
+    WT_WARNF_ONCE(TEXT("reward-text"), Target,
+        TEXT("[research] reward text <= %d/4 field(s) written on '%s' "
              "(mUnlockName/mUnlockDescription/mUnlockIconBig/mUnlockIconSmall); readback=\"%s\""),
-        Written, *ReadBack.Left(96));
+        Written, *Target->GetClass()->GetName(), *ReadBack.Left(96));
 }
 
 // ================================================================================================
@@ -384,6 +624,127 @@ UWTUpgradeResearchBase::UWTUpgradeResearchBase()
 {
 }
 
+// ★2026-11-05：给研究树类用的 public 入口（见头文件注释）。
+//   mSchematics / mRequireAllSchematicsToBePurchased 都是本类**继承来的 protected** 成员，
+//   派生类成员函数通过派生类类型对象访问它们是标准 C++ 允许的，无需额外 AccessTransformer。
+void UWT_SchematicPurchasedDep::WT_Configure(const TArray<TSubclassOf<UFGSchematic>>& InSchematics,
+                                             bool bRequireAll)
+{
+    mSchematics.Empty();
+    for (const TSubclassOf<UFGSchematic>& S : InSchematics)
+    {
+        if (S)
+        {
+            mSchematics.Add(S);
+        }
+    }
+    mRequireAllSchematicsToBePurchased = bRequireAll;
+}
+
+// ================================================================================================
+// ★2026-11-05 节点描述里的「前置条件 + 是否已达成」
+//
+// 为什么要拆成"登记 + 刷新"两步：
+//   `Apply()` 在 **CDO 构造期** 跑，那时没有存档、没有玩家 ⇒ 算不出哪条已达成；
+//   而节点面板要显示的是**当前存档**的达成状态。
+//   所以 Apply 只登记清单（BaseDesc + Prereqs），真正写 `mDescription` 由世界侧 1s 定时器
+//   调 `WT_RefreshPrereqText` 做，内容没变就不写（幂等）。
+// ================================================================================================
+namespace
+{
+    struct FWTDescEntry
+    {
+        FString                    BaseDesc;
+        TArray<FWTSchematicPrereq> Prereqs;
+        FString                    LastWritten;
+    };
+
+    TMap<UClass*, FWTDescEntry>& WT_DescTable()
+    {
+        static TMap<UClass*, FWTDescEntry> Table;
+        return Table;
+    }
+}
+
+void UWTUpgradeResearchBase::WT_RegisterPrereqText(UClass* SchematicClass, const FString& BaseDesc,
+                                                   const TArray<FWTSchematicPrereq>& Prereqs)
+{
+    if (!SchematicClass)
+    {
+        return;
+    }
+    FWTDescEntry& E = WT_DescTable().FindOrAdd(SchematicClass);
+    E.BaseDesc = BaseDesc;
+    E.Prereqs  = Prereqs;
+}
+
+void UWTUpgradeResearchBase::WT_RefreshPrereqText(AFGSchematicManager* SM)
+{
+    if (!SM)
+    {
+        return;
+    }
+
+    for (TPair<UClass*, FWTDescEntry>& KV : WT_DescTable())
+    {
+        UClass* Cls = KV.Key;
+        if (!Cls)
+        {
+            continue;
+        }
+        // ★必须转成**本类**指针：`mDescription` 是 UFGSchematic 的 protected 成员，
+        //   通过基类指针访问在 C++ 里不合法（protected 只能经由派生类型对象访问）。
+        UWTUpgradeResearchBase* CDO = Cast<UWTUpgradeResearchBase>(Cls->GetDefaultObject());
+        if (!CDO)
+        {
+            continue;
+        }
+
+        FString Text = KV.Value.BaseDesc;
+        if (KV.Value.Prereqs.Num() > 0)
+        {
+            Text += TEXT("\n\n【前置条件】");
+            for (const FWTSchematicPrereq& P : KV.Value.Prereqs)
+            {
+                bool bMet = false;
+                if (P.bRequireAll)
+                {
+                    bMet = P.Classes.Num() > 0;
+                    for (UClass* C : P.Classes)
+                    {
+                        if (!C || !SM->IsSchematicPurchased(TSubclassOf<UFGSchematic>(C)))
+                        {
+                            bMet = false;
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    for (UClass* C : P.Classes)
+                    {
+                        if (C && SM->IsSchematicPurchased(TSubclassOf<UFGSchematic>(C)))
+                        {
+                            bMet = true;
+                            break;
+                        }
+                    }
+                }
+                Text += FString::Printf(TEXT("\n%s %s%s"),
+                                        bMet ? TEXT("✔") : TEXT("✘"),
+                                        *P.Label,
+                                        bMet ? TEXT("（已达成）") : TEXT(""));
+            }
+        }
+
+        if (Text != KV.Value.LastWritten)
+        {
+            KV.Value.LastWritten = Text;
+            CDO->mDescription = FText::FromString(Text);
+        }
+    }
+}
+
 // ================================================================================================
 // Apply —— 把一个 CDO 配成研究节点
 // ================================================================================================
@@ -403,9 +764,10 @@ void UWTUpgradeResearchBase::Apply(EWTUpgradeTrack Track, int32 Level, EWTFinalR
     //   消耗强化能量碎片的「碎片路线」= 红，不消耗的「常规路线」= 黄。贴图+染色双保险，
     //   都铺上（本项目已实测 HUB 会对图标整体染色，所以单靠一种未必显示得出来）。
     WT_ApplySchematicIconStyled(this,
-        bFinal ? ((Route == EWTFinalRoute::Boost) ? EWTSchematicIconStyle::FinalBoost
-                                                 : EWTSchematicIconStyle::FinalPlain)
-               : (EWTSchematicIconStyle)((int32)EWTSchematicIconStyle::Track0 + ti));
+        bFinal
+            ? ((Route == EWTFinalRoute::Boost) ? EWTSchematicIconStyle::FinalBoost
+                                               : EWTSchematicIconStyle::FinalPlain)
+            : (EWTSchematicIconStyle)((int32)EWTSchematicIconStyle::Track0 + ti));
 
     mType            = ESchematicType::EST_MAM;
     // ★v0.2.48 修 bug F（MAM 研究在游戏 Tier 1 看不到 WT T1/T2 节点）：
@@ -478,7 +840,8 @@ void UWTUpgradeResearchBase::Apply(EWTUpgradeTrack Track, int32 Level, EWTFinalR
     // ---- 奖励（mUnlocks）★0.2.43 重排 ----
     // 用户定案「图标下面写文字说明」⇒ 采用**原版顺序**：[0] 图标行、[1] 文字行。
     //   图标行 = UFGUnlockRecipe（`BP_UnlockRecipe_C` 实例，挂 mRecipes）；
-    //   文字行 = **`BP_UnlockInfoOnly_C` 实例** + schematic 自身的 mUnlockName/mUnlockDescription。
+    //   文字行 = **`BP_UnlockInfoOnly_C` 实例**，其 mUnlockName/mUnlockDescription/mUnlockIcon*
+    //            **由本函数写入该实例自身**（★2026-11-05 修正：写 schematic 恒 0/4）。
     // ★0.2.36h 的 UWTUnlockInfo（自建原生 C++ 子类）渲染不出来 —— 原因同 skill §11.6：
     //   奖励面板的显示逻辑长在原版**蓝图**里，原生 unlock 类没有蓝图图 ⇒ spawn 不出 widget。
     //   （官方 Docs JSON 取证：原版 unlock 实例**无一例外**都是 BP 类。）
@@ -526,8 +889,8 @@ void UWTUpgradeResearchBase::Apply(EWTUpgradeTrack Track, int32 Level, EWTFinalR
     }
 
     // ---- [1] 文字行：说明（排在图标下面）★0.2.43 ----
-    // 文字数据写在 **schematic 自己**（反射，见本文件顶部的 WT_ApplyRewardText）；
-    // 这条 BP 条目只负责把它渲染出来（原版同款：条目裸挂、数据在 schematic）。
+    // 文字数据写在这条 unlock **实例自身**（反射，见本文件顶部的 WT_ApplyRewardText）；
+    // ★2026-11-05 纠正：不是写在 schematic 上（写 schematic 恒 0/4，已实测）。
     {
         static UClass* BPInfoOnly = nullptr;
         if (!BPInfoOnly)
@@ -546,6 +909,17 @@ void UWTUpgradeResearchBase::Apply(EWTUpgradeTrack Track, int32 Level, EWTFinalR
             {
                 Info->AddToRoot();
                 mUnlocks.Add(Info);
+
+                // ★★★2026-11-05：文字/图标写在**这条 unlock 实例**上（不是 schematic 上）。
+                //   见 WT_ApplyRewardText 顶部的实测纠错：写 schematic 恒 0/4。
+                // ★2026-11-07（Bug A）：奖励区控件只渲染 mUnlockName（不渲染描述），原「提升多少」
+                //   写在描述里玩家看不到 ⇒ 把关键提升量拼进奖励名（mUnlockName），一眼可见。
+                const FText RewardName = FText::Format(
+                    WT_LOCTEXT("RewardNameFmt", "{0}{1}"),
+                    mDisplayName, WT_RewardNameBoost(ti, Level, bFinal, Route));
+                WT_ApplyRewardText(Info, RewardName,
+                                   WTRewardDescription(ti, Level, bFinal, Route),
+                                   Cast<UTexture2D>(mSchematicIcon.GetResourceObject()));
             }
             else
             {
@@ -557,10 +931,6 @@ void UWTUpgradeResearchBase::Apply(EWTUpgradeTrack Track, int32 Level, EWTFinalR
         {
             WT_WARNF(TEXT("[research] BP_UnlockInfoOnly_C did not resolve; reward text line missing."));
         }
-
-        WT_ApplyRewardText(this, mDisplayName,
-                           WTRewardDescription(ti, Level, bFinal, Route),
-                           Cast<UTexture2D>(mSchematicIcon.GetResourceObject()));
     }
 
     // ---- [2] 云端配额（★0.2.47 设计表 §6.1/§6.2/§6.3/§6.5 —— **给四座云端站的加成**）----
@@ -574,14 +944,37 @@ void UWTUpgradeResearchBase::Apply(EWTUpgradeTrack Track, int32 Level, EWTFinalR
     // 落成 unlock 增量（原版语义 = 累加，基点 = 原版默认 1 组）：
     //   Lv1 = +1；Lv2~16 = 每级 +2；末段 常规 +2 / 碎片 +3。
     //   复核：1+1=2 ✓ … 1+1+2×15=32 ✓；末段 32+2k→40 ✓ / 32+3k→44 ✓ —— 与 §6.2 逐行一致。
+    //
+    // ★1.0.7 改口径（用户 2026-10-27 定案：「当前初始是 1000（铁板）… MAM 研究 2 级 ×1.1 倍、
+    //   3 级 ×1.2 倍如此」）：**不再用原版那套每级 +N 组**，改成「固定基线 × 等级系数」。
+    //   目标组数 = Remote_FactoryCloudQuota::TargetStacks(Level)：
+    //     未研究 10 组 | Lv1 10 | Lv2 11 | Lv3 12 … Lv16 25 | 末段常规 26/27/28/29、
+    //     碎片路线 27/28/29/30（原版碎片路线每级多 +1 组 ⇒ 系数 +0.1 = 10 组基线下正好 1 组）。
+    //   unlock 是**累加**语义，所以这里写的是「本级目标 − 上一级目标」的差额，而不是目标本身。
+    //   Lv1 的系数是 1.0（用户口径里 1 级不带容量增益）⇒ 增量为 0，本级不发放配额 unlock。
     // ★累加语义安全性（§5.2b 已论证）：Lv17 两条路线二选一、永不同时生效 ⇒ 不存在双份累加。
     // ★实例复用：mQuotaUnlock 是 UPROPERTY（GC 追踪、CDO 持有），Apply 重跑复用同一实例；
     //   主路径 NewObject 自原版 BP_UnlockCentralStorageItemLimit_C（渲染兼容 + Apply 走真机代码），
     //   BP 解析不到才落 UWTUnlockCloudQuota 原生兜底。
     if (bFinal || (ti == 0))   // 末段三轨一起涨 ⇒ 容量在内；非末段只有容量轨（ti=0）
     {
-        const int32 Increase = (Level <= 1) ? 1
-                             : ((bFinal && Route == EWTFinalRoute::Boost) ? 3 : 2);
+        // ★1.0.7 等级系数（见 Remote_FactoryCloudQuota.h）：目标组数由等级算出，
+        //   unlock 记录的是「本级目标 − 上一级目标」的差额（累加语义）。
+        //   ★上一级的系数必须用**同一条路线**算：碎片路线的 +0.1 只在 Lv17 首次生效
+        //   （之后每级和常规一样只涨 1 组）。若 Lv18~20 拿「上一级常规值」当被减数，
+        //   每级差额都会算成 +2，累加到 Lv20 就变成 33 组（目标 30）—— 深①穷举抓出来的。
+        //   Lv17 的上一级是 Lv16（还不属于末段）⇒ 那一级确实是 +2。
+        //   ★★★用户 2026-10-27「MAM 现在不加上去」：总闸 `WT_FEATURE_CLOUD_QUOTA_MAM=false`
+        //   让 TargetStacks 恒 = 10 ⇒ TargetNow == TargetPrev ⇒ Increase 恒 0 ⇒ 一个配额 unlock
+        //   都不发（下面 `Increase > 0` 才 Add 到 mUnlocks）。本段其余逻辑不必再判闸。
+        const bool  bShardRoute = (bFinal && Route == EWTFinalRoute::Boost);
+        const int32 TargetNow   = Remote_FactoryCloudQuota::TargetStacks(Level, bShardRoute);
+        const bool  bPrevShard  = bShardRoute
+                                && (Level - 1) >= Remote_FactoryCloudQuota::WT_FinalFirstLevel;
+        const int32 TargetPrev  = (Level <= 1)
+            ? Remote_FactoryCloudQuota::WT_InitialStacks
+            : Remote_FactoryCloudQuota::TargetStacks(Level - 1, bPrevShard);
+        const int32 Increase    = FMath::Max(0, TargetNow - TargetPrev);
 
         static UClass* BPQuota = nullptr;
         if (!BPQuota)
@@ -613,11 +1006,13 @@ void UWTUpgradeResearchBase::Apply(EWTUpgradeTrack Track, int32 Level, EWTFinalR
                 P->SetPropertyValue(P->ContainerPtrToValuePtr<void>(mQuotaUnlock), Increase);
                 bSet = true;
             }
-            if (bSet)
+            // ★1.0.7 Lv1 的等级系数是 1.0 ⇒ Increase = 0：不发放配额 unlock（否则玩家会在
+            //   解锁列表里看到一条「云端容量」却什么都加不了的奖励）。
+            if (bSet && Increase > 0)
             {
                 mUnlocks.Add(mQuotaUnlock);
             }
-            else
+            else if (!bSet)
             {
                 WT_WARNF(TEXT("[research] mItemStackLimitIncrease reflection missing -- cloud quota skipped."));
             }
@@ -626,45 +1021,50 @@ void UWTUpgradeResearchBase::Apply(EWTUpgradeTrack Track, int32 Level, EWTFinalR
         {
             WT_WARNF(TEXT("[research] cloud quota unlock unavailable (BP class did not resolve) -- cloud quota skipped."));
         }
+
+        // 诊断锚点（WT_LOGF 被 WT_LOG_VERBOSE=false 剔除，必须用 WT_WARNF）。
+        // 期望（闸开）：Lv1 -> 10 组(+0) | Lv2 -> 11(+1) | Lv16 -> 25(+1) | 末段常规 Lv20 -> 29(+1) / 碎片 30(+2)
+        // 期望（闸关）：任意级 -> 10 组(+0, mam-scaling=off)
+        WT_WARNF(TEXT("[cloud-quota] research Lv%d%s -> %d stacks/class (factor %d%%, unlock +%d, mam-scaling=%s)"),
+                 Level, bShardRoute ? TEXT(" shard") : TEXT(""),
+                 TargetNow, Remote_FactoryCloudQuota::FactorPercent(Level, bShardRoute), Increase,
+                 Remote_FactoryCloudQuota::WT_FEATURE_CLOUD_QUOTA_MAM ? TEXT("on") : TEXT("off"));
     }
 
     // ---- [3] 碎片补偿发放（★0.2.47 设计表 §6.6 —— 用户定案「根据全图能量蛞蝓计算，在 MAM 中补偿」）----
-    // 产能轨 Lv1~16 每级随研究一次性发放强化能量碎片（§6.6 ③ 逐级表，合计 1600 精确配平）；
-    // Lv17~20 不发放（末段改为碎片路线额外消耗 50/100/200/300 —— 已在上方成本段实现）。
-    // 发货走 UWTUnlockGiveItemShard（商店同款，UFGUnlockGiveItem abstract ⇒ 子类）。
+    // 产能轨 Lv1~16 每级随研究一次性发放强化能量碎片；Lv17~20 不发放（末段改为碎片路线额外
+    // 消耗 50/100/200/300 —— 已在上方成本段实现）。发货走 UWTUnlockGiveItemShard（商店同款）。
+    //
+    // ★§6.6 具体补偿机制（设计表原文，改收集率/装机目标后由 F:\Workbuddy\SMLDev\_wt_compensation.py 复算）：
+    //   ⚠ 两个「碎片」要分清：
+    //     · 原版能量碎片（Desc_CrystalShard）—— 蛞蝓按原版配方造的，仅是**基准量**，不直接发放；
+    //     · 我们的强化能量碎片（UWTUpgradePowerShardDescriptor）—— 本 mod 改成 MAM 产物，**补偿发的就是它**。
+    //   ① 蛞蝓（原版 collectible）→ 原版配方 → 原版能量碎片（仅作折算基准）：
+    //        蓝 596×1@80% = 477 | 黄 389×2@60% = 466 | 紫 257×5@40% = 515 ⇒ 现实 1458 原版碎片
+    //        扣「能量读数」研究占用 9 ⇒ 现实可支配 1449 原版碎片（满收集 2650）。
+    //   ② 把基准原版碎片按「2 原版→1 强化」折算成**我们的强化能量碎片**，再加保障额度：
+    //        损耗补偿 = 1449÷2 = 724（我们的强化碎片；2 原版→1 强化，每合成净损 1 原版）；
+    //        保障额度 = 876（目标装机 1500 + 末段门槛 650 + 周转 174 − 自合成 724，单位均为我们的强化碎片）；
+    //        ⇒ 补偿池 = 724 + 876 = 1600 **我们的强化能量碎片**，随 LV1~16 逐级发放（§6.6 ③）。
+    //   ⑥ 装机核算公式（复算口径）：补偿池 = 研究门槛 + 目标装机台数 + 周转余量 − 724。
+    //   ★终点：下方 mGrantUnlock 发的是 UWTUpgradePowerShardDescriptor（我们的），不是原版 Desc_CrystalShard。
+    // 下方常量把这套口径编译期固化：改收集率/装机目标时按公式重算，本段发放表随之调整。
+    static constexpr int32 WT_Shards_BaselineVanilla = 1449;                                // ① 基准：现实可支配原版能量碎片（仅折算用）
+    static constexpr int32 WT_Shards_CompLoss        = WT_Shards_BaselineVanilla / 2;       // ② 折算成我们的强化碎片 = 724
+    static constexpr int32 WT_Shards_CompBuffer      = 876;                                 // ② 保障额度（我们的强化碎片）
+    static constexpr int32 WT_Shards_CompPool        = WT_Shards_CompLoss + WT_Shards_CompBuffer; // = 1600 我们的强化碎片
+    static_assert(WT_Shards_CompPool == 1600, "§6.6 我们的强化碎片补偿池必须 = 1600");
+    // ---- [3] 碎片补偿发放（★0.2.47 设计表 §6.6）----
+    // ★2026-11-07 改为「研究完成时显式发放」：UFGUnlockGiveItem 在 MAM 路径下只是容器
+    //   （SDK 头注释 "Doesn't actually do anything on unlock"），研究系统不读它发物品，
+    //   光塞进 mUnlocks 进不了背包。改为登记「schematic 类 → 发放量」，由刷新钩子
+    //   WT_GivePendingShardCompensation 在研究完成时显式 AddStack 到玩家背包（幂等去重）。
     if (!bFinal && ti == 2)
     {
-        static const int32 GShardGrant[16] =
-        {
-            36,  38,  38,  40,    // Ⅰ LV1~4   = 152
-            62,  65,  66,  68,    // Ⅱ LV5~8   = 261
-            105, 108, 111, 112,   // Ⅲ LV9~12  = 436
-            180, 185, 190, 196    // Ⅳ LV13~16 = 751（合计 1600）
-        };
-
-        const int32 Grant = GShardGrant[FMath::Clamp(Level, 1, 16) - 1];
-
-        if (!mGrantUnlock)
-        {
-            mGrantUnlock = NewObject<UWTUnlockGiveItemShard>(this);
-            if (mGrantUnlock)
-            {
-                mGrantUnlock->AddToRoot();   // ROOT-PIN（0.2.40 同款纪律）
-            }
-        }
-
-        if (mGrantUnlock)
-        {
-            TArray<FItemAmount> GrantItems;
-            GrantItems.Add(FItemAmount(
-                TSubclassOf<UFGItemDescriptor>(UWTUpgradePowerShardDescriptor::StaticClass()), Grant));
-            mGrantUnlock->AddItemsToGive(GrantItems);
-            mUnlocks.Add(mGrantUnlock);
-        }
-        else
-        {
-            WT_WARNF(TEXT("[research] NewObject<UWTUnlockGiveItemShard> failed -- Lv%d shard grant skipped."), Level);
-        }
+        const int32 Grant = WT_ShardGrantAt(Level);   // Clamp(Lv,2,16)-1：LV1 取 index1 = 38（前移定案，机制为 Clamp 非数组前移）
+        WT_RegisterShardGrant(this->GetClass(), Grant);
+        WT_WARNF(TEXT("[wt-shard] registered Lv%d compensation: %d enhanced shards (granted on research completion)."),
+                 Level, Grant);
     }
 
     // ---- 依赖（四层门禁）----
@@ -850,13 +1250,16 @@ void UWTUpgradeResearchBase::Apply(EWTUpgradeTrack Track, int32 Level, EWTFinalR
                 AddPurchasedDep(S4);
             }
 
-            // ④ 末段路线门禁：与另一条路线的 Lv17 互斥（末段唯一互斥点）
-            const EWTFinalRoute Other =
-                (Route == EWTFinalRoute::Boost) ? EWTFinalRoute::Plain : EWTFinalRoute::Boost;
+            // ④ 末段路线门禁：与「其它所有路线」的 Lv17 互斥（二选一）
+            static const EWTFinalRoute AllFinal[] = { EWTFinalRoute::Plain, EWTFinalRoute::Boost };
             TArray<TSubclassOf<UFGSchematic>> OtherRoute;
-            if (TSubclassOf<UFGSchematic> OtherCls = WT_FinalResearchClassFor(Other, Level))
+            for (EWTFinalRoute R : AllFinal)
             {
-                OtherRoute.Add(OtherCls);
+                if (R == Route) continue;
+                if (TSubclassOf<UFGSchematic> OtherCls = WT_FinalResearchClassFor(R, Level))
+                {
+                    OtherRoute.Add(OtherCls);
+                }
             }
             AddNotPurchasedDep(OtherRoute);
         }
@@ -870,6 +1273,113 @@ void UWTUpgradeResearchBase::Apply(EWTUpgradeTrack Track, int32 Level, EWTFinalR
                 AddPurchasedDep(One);
             }
         }
+    }
+
+    // ★★★2026-11-05 用户要求：「不可研究也写上说明原因 / 把前置条件写出来 / 已达成也标注（已达成）」。
+    //   `Apply()` 在 CDO 期跑，此时没有存档、没有玩家 ⇒ 算不出哪条已达成。
+    //   所以这里只**登记**「基础描述 + 前置条件清单」，达成状态交给世界侧 1s 定时器
+    //   调 `WT_RefreshPrereqText` 刷新（与方块推进共用同一个 ticker）。
+    {
+        TArray<FWTSchematicPrereq> Prereqs;
+
+        auto AddOne = [&Prereqs](const FString& Label, UClass* C, bool bRequireAll = true)
+        {
+            if (!C)
+            {
+                return;
+            }
+            FWTSchematicPrereq E;
+            E.Label       = Label;
+            E.bRequireAll = bRequireAll;
+            E.Classes.Add(C);
+            Prereqs.Add(E);
+        };
+
+        if (bFinal)
+        {
+            if (Level == WT_FinalMinLevel)
+            {
+                // 末段入口 = 任一轨走到 Lv16（OR 语义），故三个类放同一条、bRequireAll=false
+                FWTSchematicPrereq E;
+                E.Label       = FString::Printf(TEXT("任一轨完成阶段 Ⅳ（Lv%d）"), WT_Stage4MaxLevel);
+                E.bRequireAll = false;
+                for (int32 t = 0; t < 3; ++t)
+                {
+                    if (UClass* C = WT_ResearchClassFor(GWTTracks[t], WT_Stage4MaxLevel))
+                    {
+                        E.Classes.Add(C);
+                    }
+                }
+                Prereqs.Add(E);
+
+                // 末段二选一互斥：对每条「其它路线」各挂一条未购买前置
+                static const EWTFinalRoute AllFinal[] = { EWTFinalRoute::Plain, EWTFinalRoute::Boost };
+                for (EWTFinalRoute R : AllFinal)
+                {
+                    if (R == Route) continue;
+                    if (UClass* C = WT_FinalResearchClassFor(R, Level))
+                    {
+                        // ★措辞是「措辞即判据」：刷新器只在前面加 ✔/✘ 和（已达成），文案本身不变。
+                        //   Lv17 是末段路线唯一决策点，故其前置条件文案额外点明「选定后不可更改」，防误触。
+                        FWTSchematicPrereq X;
+                        X.Label = (Level == WT_FinalMinLevel)
+                            ? FString::Printf(TEXT("⚠ 末段路线一次性选择（选定后 Lv18~20 不可更改）：另一条末段路线（Lv%d）未被购买"), Level)
+                            : FString::Printf(TEXT("二选一：另一条末段路线（Lv%d）未被购买"), Level);
+                        X.Classes.Add(C);
+                        Prereqs.Add(X);
+                    }
+                }
+            }
+            else
+            {
+                AddOne(FString::Printf(TEXT("本路线 Lv%d"), Level - 1),
+                       WT_FinalResearchClassFor(Route, Level - 1));
+            }
+        }
+        else if (InStage > 1)
+        {
+            AddOne(FString::Printf(TEXT("本轨 Lv%d"), Level - 1), WT_ResearchClassFor(Track, Level - 1));
+        }
+        else if (Stage > 1)
+        {
+            // 阶段同步门禁：上一阶段整层（单轨制下 = 本轨 4 级；三轨并行 = 12 级）
+            if (WT_bSingleTrackMode)
+            {
+                TArray<TSubclassOf<UFGSchematic>> PrevStage;
+                WT_CollectTrackStageSchematics(Track, Stage - 1, PrevStage);
+                FWTSchematicPrereq E;
+                E.Label = FString::Printf(TEXT("本轨阶段 %d 全部 %d 级"), Stage - 1, PrevStage.Num());
+                for (const TSubclassOf<UFGSchematic>& S : PrevStage)
+                {
+                    if (UClass* C = S.Get())
+                    {
+                        E.Classes.Add(C);
+                    }
+                }
+                Prereqs.Add(E);
+            }
+            else
+            {
+                TArray<TSubclassOf<UFGSchematic>> PrevStage;
+                WT_CollectStageSchematics(Stage - 1, PrevStage);
+                FWTSchematicPrereq E;
+                E.Label = FString::Printf(TEXT("阶段 %d 全部 %d 级（本层 3 个方块）"), Stage - 1, PrevStage.Num());
+                for (const TSubclassOf<UFGSchematic>& S : PrevStage)
+                {
+                    if (UClass* C = S.Get())
+                    {
+                        E.Classes.Add(C);
+                    }
+                }
+                Prereqs.Add(E);
+            }
+        }
+        else
+        {
+            AddOne(TEXT("HUB T1 里程碑「智能工厂」已购买"), URemote_FactoryMilestone::StaticClass());
+        }
+
+        WT_RegisterPrereqText(GetClass(), mDescription.ToString(), Prereqs);
     }
 
     WT_LOGF(TEXT("[research] configured %s Lv%d (stage=%d route=%d, cost=%d lines, deps=%d)."),
@@ -938,6 +1448,39 @@ int32 WT_GetTrackLevel(UWorld* World, EWTUpgradeTrack Track)
     return 1;   // 什么都没研究 -> 按 1 级算（建筑本来也不会存在）
 }
 
+bool WT_IsTrackResearched(UWorld* World, EWTUpgradeTrack Track)
+{
+    if (!World)
+    {
+        return false;
+    }
+    const AFGSchematicManager* SM = AFGSchematicManager::Get(World);
+    if (!SM)
+    {
+        return false;
+    }
+    // 末段 Lv17~20：三轨合并，任一路线买过即算研究过
+    for (int32 L = WT_MaxUpgradeLevel; L >= WT_FinalMinLevel; --L)
+    {
+        const TSubclassOf<UFGSchematic> P = WT_FinalResearchClassFor(EWTFinalRoute::Plain, L);
+        const TSubclassOf<UFGSchematic> B = WT_FinalResearchClassFor(EWTFinalRoute::Boost, L);
+        if ((P && SM->IsSchematicPurchased(P)) || (B && SM->IsSchematicPurchased(B)))
+        {
+            return true;
+        }
+    }
+    // Lv1~16：本轨自己的链，任一级买过即算
+    for (int32 L = 1; L <= WT_Stage4MaxLevel; ++L)
+    {
+        const TSubclassOf<UFGSchematic> C = WT_ResearchClassFor(Track, L);
+        if (C && SM->IsSchematicPurchased(C))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 float WT_TrackScale(EWTUpgradeTrack Track, int32 Level, EWTFinalRoute Route)
 {
     if (Level < 1) Level = 1;
@@ -947,7 +1490,7 @@ float WT_TrackScale(EWTUpgradeTrack Track, int32 Level, EWTFinalRoute Route)
         (Track == EWTUpgradeTrack::PowerStorage) ? 1.25f :
                                                    1.14f;
 
-    const float PlainScale = FMath::Pow(Growth, (float)(Level - 1));
+    const float PlainScale = FMath::Pow(Growth, (float)Level);
 
     // 常规路线 / Lv1~16：原曲线
     if (Route != EWTFinalRoute::Boost || Level <= WT_Stage4MaxLevel)
@@ -956,8 +1499,25 @@ float WT_TrackScale(EWTUpgradeTrack Track, int32 Level, EWTFinalRoute Route)
     }
 
     // ★碎片路线 Lv17~20：以 Lv16 为基点做 1.5 倍**增量**外推（设计表 §6.1 末段双路线）
-    const float Base16 = FMath::Pow(Growth, (float)(WT_Stage4MaxLevel - 1));
+    const float Base16 = FMath::Pow(Growth, (float)WT_Stage4MaxLevel);
     return Base16 + 1.5f * (PlainScale - Base16);
+}
+
+float WT_PowerStorageChargeCapMW(int32 Level)
+{
+    // ★2026-11-07 充电速率定案：按里程碑档位固定上限，不再随等级 ×1.25 暴涨。
+    // 阶段 = (Level-1)/4：Lv1~4->0 … Lv17~20->4。Level<1 按 1 处理（与 WT_TrackScale 一致）。
+    const int32 Stage = FMath::Clamp((FMath::Max(Level, 1) - 1) / 4, 0, 4);
+    static constexpr float CapByStage[] = { 200.f, 500.f, 1000.f, 2500.f, 5000.f };
+    return CapByStage[Stage];
+}
+
+int32 WT_PowerStorageMWh(int32 Level, EWTFinalRoute Route)
+{
+    // ★2026-11-08 百位取整：与实际建筑加成共用同一公式（1600 × 等级倍率），仅在此处统一取整，
+    //   保证「奖励名写的 = 奖励描述写的 = 建筑实际给的」三者完全一致。
+    const float s = WT_TrackScale(EWTUpgradeTrack::PowerStorage, Level, Route);
+    return WT_RoundToHundred(FMath::RoundToInt(GPowerStorageBaseMWh * s));
 }
 
 float WT_AcceleratorBoostAtLevel(int32 Level, EWTFinalRoute Route)
@@ -965,7 +1525,7 @@ float WT_AcceleratorBoostAtLevel(int32 Level, EWTFinalRoute Route)
     // 与 Remote_FactoryUpgrades::MaxProductionBoost() 的封顶必须保持一致。
     const auto PlainBoost = [](int32 L)
     {
-        return FMath::Clamp(2.0f * FMath::Pow(1.14f, (float)(L - 1)), 1.0f, 30.0f);
+        return FMath::Clamp(2.0f * FMath::Pow(1.14f, (float)L), 1.0f, 30.0f);
     };
 
     const float Plain = PlainBoost(FMath::Max(Level, 1));

@@ -105,6 +105,8 @@ AWTUpgradeCloudFluidDownloaderHologram::AWTUpgradeCloudFluidDownloaderHologram()
     mMaxPlacementFloorAngle = 90.f;
 }
 
+
+
 AWTUpgradeAcceleratorHologram::AWTUpgradeAcceleratorHologram()
 {
     mNeedsValidFloor = false;

@@ -263,10 +263,14 @@ URemote_FactoryMilestone::URemote_FactoryMilestone()
     // Content-free fields only. mCost / mSchematicCategory need /Game/... classes, which
     // ApplyMilestoneData() resolves once the game content is mounted.
     mType = ESchematicType::EST_Milestone;
-    // ★0.2.141（用户 2026-10-20 定案）-- 里程碑成本与车间配方对调：里程碑改采原手持终端料单
-    // （20×铁棒 + 30×螺丝 + 10×铜板），扫描仪不再出现在里程碑；tier 维持 2（T1 扫描仪即可做出，无卡点）。
-    // （v0.2.2 的 tier-1 定案与「两个升级建筑拆其它 tier」的旧注释随 0.2.56 建筑移除一并过时。）
-    mTechTier = 2;
+    // ★2026-11-05 改档（用户定案「挪回阶段 1」）—— 从 2 改回 **1**。
+    //   沿革：0.2.141（2026-10-20）曾把本卡从 T1 挪到 tier 2，理由是「当时料单含扫描仪，
+    //   T1 扫描仪即可做出、无卡点」。但 2026-11-05 定案后料单已换成手持终端料
+    //   （20×铁棒 + 30×螺丝 + 10×铜板，全是 T1 材料），那条理由不再成立；
+    //   而 MAM 四层门禁第一层正是「本卡已购」⇒ 卡在 tier 2 会让新档玩家在阶段 1
+    //   买不到它 ⇒ 整棵研究树全灰点不动（用户实测截图 + 存档扫描双重佐证）。
+    //   档位口径：mTechTier 是 HUB 阶段标签值（FGSchematic.h:228 注释 `[0...N]`），写 1 就是阶段 1。
+    mTechTier = 1;
     mDisplayName = WT_LOCTEXT("Building_Remote_Factory", "智能工厂");
     mDescription = WT_LOCTEXT("Milestone_Remote_Factory",
         "Unlocks the handheld Smart Factory and the High-Capacity Storage Unit. Equip the "
@@ -425,15 +429,26 @@ void URemote_FactoryMilestone::AddUnlockRecipes(UFGUnlockRecipe* Unlock) const
     //   新存档、以及尚未买 T1 的存档都正常。
     // ★0.2.56（用户定案）：T1 里程碑只解锁「手持无线终端」+「强化碎片」两样。5 个升级建筑（大容量仓库 /
     // 电力存储 / 云端下载站 / 云端流体上传·下载站）从 mod 彻底移除（研究树已清空、Wanted 已去除、里程碑亦不列）。
+    // ★1.0.7（用户 2026-10-26 原话「顺便把四个云端一起写进去」）：云端站**恢复发放**，与终端同卡
+    // （★同日追加「先把云端液体的移除，这个先不修」⇒ 本版只发**固体两台**：云端储存上传站 + 云端储存
+    //   下载站）；仅超级蓄电池（0.2.56 之外另由 T3 存储
+    // 里程碑发放）与产能加速器（退役，产能轨改走纯物品路线）仍不在这张卡里。
     Unlock->mRecipes.AddUnique(URemote_FactoryEquipRecipe::StaticClass());
-    // ★0.2.134：强化能量碎片改由 WT_FEATURE_POWER_SHARD 单开关控制（见 Remote_FactoryRegistry.h）。
-    //   0.2.57 注：强化碎片是**两个**配方——构造机 + 量子编码器，少给编码器会导致新档买了 T1
-    //   只拿到构造机配方，编码器要等读档补发。开关打开时两条一起发。
-    if (WT_FEATURE_POWER_SHARD)
-    {
-        Unlock->mRecipes.AddUnique(UWTUpgradePowerShardRecipe::StaticClass());
-        Unlock->mRecipes.AddUnique(UWTUpgradePowerShardSynthRecipe::StaticClass());
-    }
+    // ★2026-11-05 用户定案（原话「云端固体放到 T5，云端液体放到 T7，强化能量碎片放到 T9」）：
+    //   T1「智能工厂」卡**只管手持终端**，建筑配方全部搬走，各自由独立卡发放：
+    //     · 强化碎片三条配方  → UWTUpgradePowerShardMilestone（T9）
+    //     · 云端固体两站      → UWTUpgradeCloudSolidMilestone（T5）
+    //     · 云端液体两站      → UWTUpgradeCloudFluidMilestone（T7）
+    //   ⚠ 老存档兼容：mAvailableRecipes 只增不减，已买过 T1 的存档里那些配方本来就还在，
+    //     本次改动不会回收（它们也不是退役配方，不进 Retired）⇒ 老档照常能造。
+    //     新存档必须逐张买卡。同步点：WT_RepairRecipeAvailability 的 Live / Wanted 门槛也要改，
+    //     否则会出现「买了 T5 卡、读档后又没了」（0.2.48 那类事故）。
+    // ★1.0.7 实测核对锚点（**必须 Warning 级** —— WT_LOGF 被 WT_LOG_VERBOSE=false 编译剔除，
+    // Shipping 日志里看不到，上一轮就因此白排查一轮）。查「买了卡但没东西」时先 grep 这一行：
+    //   "[milestone] T1 unlock recipes=N"
+    // 期望（2026-11-05 起）：recipes = 1（只剩手持终端）。
+    WT_WARNF(TEXT("[milestone] T1 unlock recipes=%d (equip only since 2026-11-05)"),
+             Unlock->mRecipes.Num());
 }
 
 namespace Remote_Factory

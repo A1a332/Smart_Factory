@@ -1,11 +1,11 @@
 {
     "FileVersion": 3,
     "Version": 1,
-  "VersionName": "1.0.13",
-  "SemVersion": "1.0.13",
+  "VersionName": "1.0.7",
+  "SemVersion": "1.0.7",
     "GameVersion": ">=502094",
     "FriendlyName": "Smart Factory",
-    "Description": "Smart Factory console. Place a Wireless Terminal and, without walking anywhere, browse every machine in the world by category with live output and power figures, open any machine's own native UI, pull its output straight into your inventory, and teleport to it. Also maps all alien-energy targets across the map -- power slugs, Mercer spheres, Somersloops and unopened drop pods -- with world coordinates (loaded from a shipped collectibles.json so the whole map shows even in unvisited regions), flags cave-dwelling targets in the list, and can teleport you to any of them.",
+    "Description": "Smart Factory console. Place a Wireless Terminal and, without walking anywhere, browse every machine, resource node and collectible in the world by category - open any machine UI, pull its output, and teleport to any of them. Ships a pre-scanned map database (507 resource nodes: ore nodes, geysers and resource well cores) with purity filtering, milestone ordering and a built-in search box, plus a hub shortcut bar for the terminal, workbench, MAM, AWESOME store and Space Elevator. Modded buildings and modded nodes are grouped under their own mod name. Landing spots are always safe: in front of the building, never inside geometry or inside vehicles/flyers.",
     "Category": "Modding",
     "CreatedBy": "Monsue",
     "CreatedByURL": "",
@@ -40,7 +40,11 @@
         {
             "Name": "SmartFactoryLib",
             "Enabled": true,
-            "SemVersion": "^1.0.0"
+            "SemVersion": "^1.0.1"
+        },
+        {
+            "Name": "GeometryScripting",
+            "Enabled": true
         }
     ],
     "LocalizationTargets": [

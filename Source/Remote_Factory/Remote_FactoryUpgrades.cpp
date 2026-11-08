@@ -1,6 +1,9 @@
 #include "Remote_FactoryUpgrades.h"
 
-#include "Remote_FactoryFluidPanel.h"
+#include "WTPortKit.h"                        // ★1.0.8AY 圆口/机身几何工具箱（可移植）
+
+#include "Remote_FactoryItemSelectPanel.h"   // ★1.0.7 固态下载站的输出物品选择面板
+#include "Remote_FactoryFluidPanel.h"         // ★1.0.6 恢复：云端液态下载站的流体选型面板（我们自己的液态云）
 #include "Remote_FactoryLoc.h"
 #include "Remote_FactoryLog.h"
 #include "Remote_FactoryCrashTrace.h"
@@ -10,6 +13,7 @@
 #include "Buildables/FGBuildablePipeReservoir.h"
 #include "Buildables/FGCentralStorageContainer.h"
 #include "FGCentralStorageSubsystem.h"
+#include "FGCentralStorageSettings.h"      // ★1.0.7o 原版上传速度的基础值（子系统取不到时回落用）
 #include "FGFactoryConnectionComponent.h"     // ★0.2.42 下载站传送带接口
 #include "FGInventoryComponent.h"
 #include "FGInventoryLibrary.h"
@@ -22,15 +26,33 @@
 #include "Components/SkeletalMeshComponent.h"   // ★0.2.48 电池建模：原版 SCS 的 SK 内部电池体
 #include "Containers/Ticker.h"
 #include "Engine/StaticMesh.h"
+#include "Math/RotationMatrix.h"   // 1.0.8AV 圆口朝向（MakeFromX/MakeFromZ）
 #include "Engine/World.h"
+#include "TimerManager.h"   // ★2026-11-01 建造特效修复：GetTimerManager().SetTimerForNextTick 重设发光材质
 #include "EngineUtils.h"
+#include "UObject/UnrealType.h"                // ★1.0.7l 反射读 mStorageInventoryHandler（FindFProperty/CastField）
 #include "Engine/BlueprintGeneratedClass.h"    // ★0.2.48 SCS 枚举：蓝图组件模板的唯一正规入口
 #include "Engine/SimpleConstructionScript.h"   // ★0.2.48 USimpleConstructionScript::GetAllNodes()
 #include "Engine/SCS_Node.h"                   // ★0.2.48 USCS_Node::GetActualComponentTemplate()
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"            // CreateDynamicMaterialInstance 返回类型
+#include "Components/DynamicMeshComponent.h"              // ★1.0.8AW 运行时程序化建模（圆口法兰）
+#include "UDynamicMesh.h"                                 // UDynamicMesh::GetMeshPtr
+#include "GeometryScript/MeshPrimitiveFunctions.h"        // ★1.0.8AW AppendRevolvePolygon（回转体）
 #include "UObject/ConstructorHelpers.h"
 #include "UObject/UObjectIterator.h"          // ★0.2.48 TObjectIterator（WS_FindVanillaClass / 描述符兜底）
+
+/**
+ * ★1.0.8AO 云端流体两台站的诊断开关。
+ *
+ * WT_FLUID_DIAG —— 每 2 秒一行 `[cloud-fluid] up/down diag`。
+ *   ★必须用 WT_WARNF（WT_LOGF 被 WT_LOG_VERBOSE=false 编译剔除，Shipping 日志里看不到）。
+ *   实测确认流体通了之后可以关掉，省日志体积。
+ *
+ * 节流步长**不在这里**：它是头文件里 `mUploadInterval` / `mDownloadInterval`（0.2s），
+ * 那个值同时充当传给原版管道接口的 dt，属于行为参数而不是诊断参数，详见头文件注释。
+ */
+static constexpr bool WT_FLUID_DIAG = true;
 
 /**
  * Write a float property by name on `Object`, whichever access section it lives in.
@@ -61,6 +83,24 @@ static bool WT_SetFloatProperty(UObject* Object, const TCHAR* PropertyName, floa
     return true;
 }
 
+/**
+ * ★★★边界（一手实测，误判过一次，记下来避免重犯）：SML 的 `Source/FactoryGame/Private/*.cpp`
+ * 是**编译期占位**，不是运行时实现。
+ *
+ * 那些看上去像空桩的函数（`Factory_PullPipeInput` 返回 false、
+ * `GetFluidBox` 返回 nullptr、`GetAllItemsFromCentralStorage` 什么都不做）在运行时
+ * **从游戏的 `FactoryGameSteam-FactoryGame-Win64-Shipping.dll` 导入真实实现**。
+ *
+ * 验证方法（不靠猜）：解析 mod DLL 的 PE 导入表，对**修饰名子串**匹配。
+ *   实测已确认导入自 `FactoryGameSteam-FactoryGame-Win64-Shipping.dll`：
+ *     ?GetFluidBox@AFGBuildablePipeReservoir@@UEAAPEAUFFluidBox@@XZ
+ *     ?Factory_PullPipeInput@UFGPipeConnectionComponent@@QEAA_NMAEAUFInventoryStack@@V?$TSubclassOf@VUFGItemDescriptor@@@@H@Z
+ *   † 判据自证：必须用**子串**匹配（导入名是修饰名）、不能拿
+ *     `Private/*.cpp` 的空函数当运行时行为。只有**inline**函数（如 `SetFluidIntegrant`）
+ *     不在导入表里（编译进 mod），那也正常。
+ *   †† 高危推论：「空桩⇒原版函数不可用⇒手写 fluid box」。实测证实不成立，
+ *     且手写 `mFluidBox` 会把原版 `BeginPlay`（真实执行）算好的几何/压强参数盖掉。
+ */
 /** Same, for an int32 property (the storage grid is sized by two of these). */
 static bool WT_SetIntProperty(UObject* Object, const TCHAR* PropertyName, int32 Value)
 {
@@ -266,17 +306,16 @@ static UClass* WT_FindVanillaClass(const TCHAR* PrimaryPath, const TCHAR* Author
 }
 
 /**
- * 把 (物品类, 数量) 直接写进云端池的 mStoredItems —— **兜底路径**（★0.2.36b）。
+ * 把 (物品类, 数量) 直接写进云端池的 mStoredItems。
  *
- * ★用户定案「为什么不走原版云端接口调用」之后：入池的**主路径**改为
- * `WT_UploadStackToPool()`（临时单格库存 → 原版 `UploadItemFromInventoryToCentralStorage`，
- * 见下），本函数降级为「原版接口不可用时」的最后兜底。
+ * ★0.2.36b 时它是**兜底路径**（主路径为 `WT_UploadStackToPool()`：临时单格库存 →
+ * 原版 `UploadItemFromInventoryToCentralStorage`）。★1.0.8AP 起它多了一个正式身份：
+ * **液体上传站的唯一入池通道** —— 原版公开入口内部只接受固体，液体只能这样写。
  *
- * 之所以还需要它：mStoredItems 是 AFGCentralStorageSubsystem 的 private SaveGame+Replicated
- * TArray<FItemAmount>，按物品类聚合。原版公开入口需要一个**真实库存组件**，遇到无法构造
- * 库存组件的极端情形时只有反射直写能把货送进去 —— 代价是绕过原版的物品上限检查与通知
- * （OnRep/委托），所以调用处一律打 WARN 日志，便于事后确认是否真的走了兜底。
- * 与 0.2.36 抄 mInteractWidgetSoftClass / 写 mMaxPotential 同一反射惯例。
+ * 因为 mStoredItems 是 AFGCentralStorageSubsystem 的 private SaveGame+Replicated
+ * TArray<FItemAmount>，按物品类聚合。代价是绕过原版的物品上限检查与通知（OnRep/委托），
+ * 所以调用处一律打日志，便于事后确认是否走了这条路（与 0.2.36 抄 mInteractWidgetSoftClass /
+ * 写 mMaxPotential 同一反射惯例）。
  * 流体类与固体类是不同的 ItemClass，条目天然分开。
  *
  * 条目限容量（GetCentralStorageItemLimit = 组数限 × 堆叠上限）对流体不适用：
@@ -344,6 +383,48 @@ static int32 WT_AddToCentralStorage(UWorld* World, UClass* ItemClass, int32 Amou
 }
 
 /**
+ * ★★1.0.8AP（用户 2026-10-28 定案「和我们现在的云端存货一样」）
+ * 把老存档里记在**单个流体上传站自己账本**上的液体，一次性迁进原版云端池。
+ *
+ * 为什么要有这一步：0.2.36b 的定案是「云端固液分开」—— 流体只记在各站自己的
+ * `mFluidLedger`，从不进原版池。后果有两个，用户都撞上了：
+ *   ① **拆站即丢货**：账本挂在建筑上，`AFGBuildable::GetDismantleRefund` 只退库存，
+ *      账本里的云端液体随建筑一起消失；
+ *   ② 与固体不一致：固体自 1.0.6 起就**直接进原版云端池**（`PumpBufferToCentralStorage`），
+ *      于是「同一个云端」在固液两侧是两套账、两个总量。
+ * 1.0.8AP 起统一：液体也写进 `AFGCentralStorageSubsystem::mStoredItems`（同固态的兜底写入器
+ * `WT_AddToCentralStorage`）。账本从此**只用于迁移**，迁完即空。
+ *
+ * 条目级处理：迁移失败（反射不可用）的条目**留在账本里**，下个周期再试 —— 绝不静默丢货。
+ *
+ * @return 本轮迁进池的件数（0 = 没有货 / 还没迁成功）。
+ */
+static int32 WT_MigrateLedgerToPool(UWorld* World, TArray<FItemAmount>& Ledger)
+{
+    if (!World || Ledger.Num() == 0)
+    {
+        return 0;
+    }
+    int32 Moved = 0;
+    // 倒序遍历：RemoveAt 不会影响还没看的下标。
+    for (int32 i = Ledger.Num() - 1; i >= 0; --i)
+    {
+        FItemAmount& IA = Ledger[i];
+        UClass* Cls = IA.ItemClass.Get();
+        if (!Cls || IA.Amount <= 0)
+        {
+            Ledger.RemoveAt(i);   // 空条目直接清掉，别在存档里留垃圾行
+            continue;
+        }
+        if (WT_AddToCentralStorage(World, Cls, IA.Amount) >= 0)
+        {
+            Moved += IA.Amount;
+            Ledger.RemoveAt(i);
+        }
+    }
+    return Moved;
+}
+/**
  * ★0.2.36 液态下载站：把面板软类指到本模组**原生 C++** UFGInteractWidget 子类
  * （选型面板不带蓝图资产，路径就是类自身的 PathName）。与 WT_ReuseVanillaInteractWidget
  * 的差别只在来源：这里是我们自己的类，不是原版蓝图 CDO。
@@ -380,12 +461,16 @@ static void WT_UseNativeInteractPanel(UObject* Target, UClass* PanelClass)
 }
 
 /**
- * ★0.2.36b 本模组自己的云账本操作（用户定案：建造取料「原版云端优先，原版没有才用我们的」）。
+ * 本模组自己的云账本操作（★0.2.36b 引入，★1.0.8AP 已退役为新货不入账）。
  *
- * 为什么必须有账本：原版云端池 mStoredItems 是**按物品类聚合、没有来源字段**的一张表，
- * 原版上传站和我们的上传站往里记的是同一行。要让「原版优先」成立，我们的货就不能直接进池，
- * 必须先记在自己名下的账本里（上传站自持、SaveGame 持久化），只在原版池里该类为 0 时
- * 才由回退 ticker 注进去。
+ * 历史：0.2.36b 为了「建造取料原版优先」把货先记在自己名下的账本里（上传站自持、SaveGame），
+ * 只在原版池里该类为 0 时才由回退 ticker 注进池。1.0.6 起**固体**改回直接进池，1.0.8AP 起
+ * **液体**也统一进池（用户定案「和我们现在的云端存货一样」）。
+ *
+ * ⇒ 现在这些 helper 的用途只剩三处：
+ *   ① 老存档迁移（`WT_MigrateLedgerToPool` 读旧账本 → 写池）；
+ *   ② 池写入不可用（mStoredItems 反射失败）时的兜底容器；
+ *   ③ 固体站的历史账本回退 ticker（1.0.6 之前留下的存货）。
  */
 static void WT_LedgerAdd(TArray<FItemAmount>& Ledger, UClass* ItemClass, int32 Amount)
 {
@@ -438,15 +523,78 @@ static int32 WT_LedgerGet(const TArray<FItemAmount>& Ledger, UClass* ItemClass)
     return 0;
 }
 
-/** 原版云端池里该类物品现有多少（0 = 原版"没修建 / 没存货"）。 */
-static int32 WT_PoolAmount(UWorld* World, UClass* ItemClass)
+/**
+ * ★★★1.0.7l 取存储建筑**真正生效**的库存组件。
+ *
+ * 一手依据（Public/Buildables/FGBuildableStorage.h:54，UPROPERTY 上方的官方注释）：
+ *     "The inventory to store everything in.
+ *      Don't use this directly, use mStorageInventoryHandler->GetActiveInventoryComponent()"
+ * 也就是说 `GetStorageInventory()` 返回的 `mStorageInventory` 是**底层那个**，官方明确要求
+ * 不要直接用它。而 SDK dump 里**没有** `mStorageInventoryHandler` 的成员声明 ——
+ * 同款注释也出现在 `FGBuildableTrainPlatformCargo.h:317`（`mCargoInventoryHandler`）上，
+ * 且同样没有声明 ⇒ 结论是「handler 存在、只是 dump 漏了」，只能靠**反射按名字**拿。
+ *
+ * 拿到 handler 之后再调它的 `GetActiveInventoryComponent()`（BlueprintPure）。
+ * 函数名在不同版本里不一样（TrainPlatformCargo 那条注释写的是 `GetActiveInventory()`），
+ * 所以两个名字都试；都不行就退回 `GetStorageInventory()`，行为与旧版一致（不会更差）。
+ *
+ * ★为什么这一步是「选择后不下载」的关键：往**非活跃**的底层库存 AddStack，货要么进不去
+ * （Added=0 ⇒ 每周期取到货又退回账本 ⇒ 永远不出货），要么进了玩家看不见的地方。
+ *
+ * @param OutHow 回填实际走的路径，用于诊断日志（一眼看出是反射命中还是兜底）。
+ */
+static UFGInventoryComponent* WT_ResolveActiveStorageInventory(AFGBuildableStorage* Storage, FString& OutHow)
 {
-    AFGCentralStorageSubsystem* Sub = World ? AFGCentralStorageSubsystem::Get(World) : nullptr;
-    if (!Sub || !ItemClass)
+    OutHow = TEXT("storage-inventory(fallback)");
+    if (!Storage)
     {
-        return 0;
+        OutHow = TEXT("null-storage");
+        return nullptr;
     }
-    return Sub->GetNumItemsFromCentralStorage(TSubclassOf<UFGItemDescriptor>(ItemClass));
+
+    // 反射结果只解析一次（类固定，不会变）。
+    static FObjectPropertyBase* HandlerProp = nullptr;
+    static bool bResolved = false;
+    if (!bResolved)
+    {
+        bResolved = true;
+        HandlerProp = CastField<FObjectPropertyBase>(FindFProperty<FProperty>(
+            AFGBuildableStorage::StaticClass(), TEXT("mStorageInventoryHandler")));
+    }
+
+    if (HandlerProp)
+    {
+        UObject* Handler = HandlerProp->GetObjectPropertyValue_InContainer(Storage);
+        if (Handler)
+        {
+            static const TCHAR* CandidateFns[] = {
+                TEXT("GetActiveInventoryComponent"),
+                TEXT("GetActiveInventory"),
+            };
+            for (const TCHAR* FnName : CandidateFns)
+            {
+                if (UFunction* Fn = Handler->FindFunction(FnName))
+                {
+                    // UFunction 的返回值是第一个 out 参数（BlueprintPure 也一样）。
+                    struct FRetParams { UFGInventoryComponent* Ret; };
+                    FRetParams Parms{};
+                    Handler->ProcessEvent(Fn, &Parms);
+                    if (UFGInventoryComponent* ActiveInv = Parms.Ret)
+                    {
+                        OutHow = FString::Printf(TEXT("%s::%s"),
+                                                 *Handler->GetClass()->GetName(), FnName);
+                        return ActiveInv;
+                    }
+                }
+            }
+            OutHow = TEXT("handler-found-but-no-active-inventory");
+        }
+        else
+        {
+            OutHow = TEXT("handler-prop-null");
+        }
+    }
+    return Storage->GetStorageInventory();
 }
 
 /**
@@ -635,6 +783,534 @@ static float WT_MeshBaseZ(const UStaticMesh* Mesh, float Fallback)
 }
 
 /**
+ * ★1.0.8BK 一次性 dump 原版建筑蓝图的组件树（外观移植的唯一一手依据）。
+ *
+ * ## 为什么必须 dump 而不是看资产名猜
+ * 用户 2026-10-28 提了两件纯外观的事：
+ *   ① 「原版云端站中间那个动态视觉效果，我们这里没有」；
+ *   ② 「把原版云端站中间掏空，把液体货运站台红框那个罐横过来塞进去」。
+ * 这两件事的答案都不在类名里，而在**蓝图 SCS 里每个组件模板的 mesh / 材质 / 变换**：
+ *   · 哪个 mesh 是"中间那块"，它挂的材质有哪些标量参数（流速/时间缩放之类的动态效果常由
+ *     材质参数或 Panner 驱动，抄材质时父材质/参数丢了就不动）；
+ *   · 液体货运站台那个罐叫什么 mesh、尺寸多大，才能算出"横过来"的旋转与缩放。
+ *
+ * 用 `USCS_Node::GetActualComponentTemplate()` 读**蓝图里定义的模板**（而不是 CDO 的
+ * 运行时组件集合）—— 前者带原始相对变换、且不受构造期逻辑改写，正是"原版长什么样"的答案。
+ *
+ * 每个组件打印：节点变量名 / 组件类 / 网格资产 / 包围盒 / 材质链（含标量参数）。
+ * 只打一次（调用方用 static 守卫），日志量约几十行。
+ */
+static void WT_DumpVanillaBuildableSCS(const TCHAR* ClassPath)
+{
+    UClass* Cls = LoadClass<AActor>(nullptr, ClassPath);
+    if (!Cls)
+    {
+        WT_WARNF(TEXT("[vanilla-dump] FAILED to load '%s'"), ClassPath);
+        return;
+    }
+
+    WT_WARNF(TEXT("[vanilla-dump] ===== %s ====="), ClassPath);
+
+    UBlueprintGeneratedClass* BPC = Cast<UBlueprintGeneratedClass>(Cls);
+    USimpleConstructionScript* SCS = BPC ? BPC->SimpleConstructionScript : nullptr;
+    if (!SCS)
+    {
+        WT_WARNF(TEXT("[vanilla-dump]   no SimpleConstructionScript (not a blueprint?)"));
+        return;
+    }
+
+    const TArray<USCS_Node*>& Nodes = SCS->GetAllNodes();
+    WT_WARNF(TEXT("[vanilla-dump]   nodes=%d"), Nodes.Num());
+    for (USCS_Node* Node : Nodes)
+    {
+        if (!Node)
+        {
+            continue;
+        }
+        UActorComponent* Tpl = Node->GetActualComponentTemplate(BPC);
+        if (!Tpl)
+        {
+            WT_WARNF(TEXT("[vanilla-dump]   node='%s' template=null"),
+                     *Node->GetVariableName().ToString());
+            continue;
+        }
+
+        UStaticMeshComponent* SMC = Cast<UStaticMeshComponent>(Tpl);
+        UStaticMesh* Mesh = SMC ? SMC->GetStaticMesh() : nullptr;
+        FString MeshDesc = TEXT("-");
+        if (Mesh)
+        {
+            const FBoxSphereBounds B = Mesh->GetBounds();
+            MeshDesc = FString::Printf(TEXT("%s | origin=%s extent=%s"),
+                                       *Mesh->GetPathName(),
+                                       *B.Origin.ToCompactString(),
+                                       *B.BoxExtent.ToCompactString());
+        }
+        else if (SMC)
+        {
+            MeshDesc = TEXT("<no static mesh>");
+        }
+
+        // 相对变换只有 USceneComponent 才有（UActorComponent 是纯逻辑组件）——
+        //   `GetRelativeLocation` / `GetRelativeScale3D` 都在 USceneComponent 上，
+        //   对 UActorComponent* 直接调会 C2039（本轮实锤一次）。
+        USceneComponent* TplScene = Cast<USceneComponent>(Tpl);
+        const FString RelLoc = TplScene ? TplScene->GetRelativeLocation().ToCompactString() : TEXT("-");
+        const FString RelScl = TplScene ? TplScene->GetRelativeScale3D().ToCompactString() : TEXT("-");
+
+        WT_WARNF(TEXT("[vanilla-dump]   node='%s' comp=%s(%s) rel=%s scl=%s | mesh=%s"),
+                 *Node->GetVariableName().ToString(),
+                 *Tpl->GetName(),
+                 *Tpl->GetClass()->GetName(),
+                 *RelLoc, *RelScl,
+                 *MeshDesc);
+
+        // 材质链：父材质 + 标量参数（材质里有没有"流速/时间"这类可动参数，一眼看得出来）。
+        if (SMC && SMC->GetNumMaterials() > 0)
+        {
+            for (int32 MatIdx = 0; MatIdx < SMC->GetNumMaterials(); ++MatIdx)
+            {
+                UMaterialInterface* MI = SMC->GetMaterial(MatIdx);
+                if (!MI)
+                {
+                    continue;
+                }
+                UMaterialInterface* Parent = MI->GetMaterial();
+                WT_WARNF(TEXT("[vanilla-dump]     mat[%d]=%s | parent=%s | dynamic=%d"),
+                         MatIdx, *MI->GetPathName(),
+                         Parent ? *Parent->GetPathName() : TEXT("none"),
+                         MI->IsA(UMaterialInstanceDynamic::StaticClass()) ? 1 : 0);
+
+                TArray<FMaterialParameterInfo> ScalarInfos;
+                TArray<FGuid> ScalarIds;
+                // ★UE5 的入口是 `GetAllScalarParameterInfo`（`GetAllScalarParameters` 在 5.x 已不存在，
+                //   本轮实锤 C2039）；取值要传 `FHashedMaterialParameterInfo`。
+                MI->GetAllScalarParameterInfo(ScalarInfos, ScalarIds);
+                for (const FMaterialParameterInfo& Info : ScalarInfos)
+                {
+                    float Value = 0.f;
+                    MI->GetScalarParameterValue(FHashedMaterialParameterInfo(Info), Value);
+                    WT_WARNF(TEXT("[vanilla-dump]       scalar '%s'=%.3f"),
+                             *Info.Name.ToString(), Value);
+                }
+            }
+        }
+    }
+}
+
+/**
+ * ★1.0.8BK 从原版蓝图 SCS 里克隆一个静态网格组件到我们的站体上。
+ *
+ * 为什么用「读模板 + 抄」而不是硬编码 mesh/材质/变换三个常量：
+ *   ① 原版组件的相对变换（位置/旋转/缩放）是设计师在蓝图里摆好的，凭包围盒反推一定会偏；
+ *   ② 材质可能是 MID（动态实例）或 MI，抄组件自带的材质数组才 1:1 保留半透明/发光参数；
+ *   ③ 以后游戏版本挪了位置，这段代码自动跟着走，不需要我们再改一遍常量。
+ */
+static UStaticMeshComponent* WT_CloneVanillaSCSComponent(
+    AActor* Owner, const TCHAR* BlueprintPath, const TCHAR* NodeName,
+    USceneComponent* AttachParent, FName CompName)
+{
+    if (!Owner || !AttachParent)
+    {
+        return nullptr;
+    }
+
+    UClass* Cls = LoadClass<AActor>(nullptr, BlueprintPath);
+    UBlueprintGeneratedClass* BPC = Cast<UBlueprintGeneratedClass>(Cls);
+    USimpleConstructionScript* SCS = BPC ? BPC->SimpleConstructionScript : nullptr;
+    if (!SCS)
+    {
+        return nullptr;
+    }
+
+    UStaticMeshComponent* Tpl = nullptr;
+    for (USCS_Node* Node : SCS->GetAllNodes())
+    {
+        if (Node && Node->GetVariableName().ToString().Equals(NodeName, ESearchCase::IgnoreCase))
+        {
+            Tpl = Cast<UStaticMeshComponent>(Node->GetActualComponentTemplate(BPC));
+            break;
+        }
+    }
+    if (!Tpl || !Tpl->GetStaticMesh())
+    {
+        return nullptr;
+    }
+
+    UStaticMeshComponent* Comp = NewObject<UStaticMeshComponent>(Owner, CompName);
+    if (!Comp)
+    {
+        return nullptr;
+    }
+
+    // 运行时 NewObject 的组件必须是 Movable（静态移动性在注册时会 checkf）。
+    Comp->SetMobility(EComponentMobility::Movable);
+    Comp->SetStaticMesh(Tpl->GetStaticMesh());
+    const int32 NumMats = FMath::Max(Tpl->GetNumMaterials(), Tpl->GetStaticMesh()->GetStaticMaterials().Num());
+    for (int32 i = 0; i < NumMats; ++i)
+    {
+        if (UMaterialInterface* M = Tpl->GetMaterial(i))
+        {
+            Comp->SetMaterial(i, M);
+        }
+    }
+    Comp->SetRelativeTransform(Tpl->GetRelativeTransform());
+
+    // 纯装饰件：不碰撞、不投影、不参与导航。
+    //   投影必须关掉 —— 半透明发光面片投影是一块纯黑剪影，比没有效果更难看。
+    Comp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    Comp->SetGenerateOverlapEvents(false);
+    Comp->SetCastShadow(false);
+    Comp->bReceivesDecals = false;
+    Comp->SetCanEverAffectNavigation(false);
+
+    // 先挂到父组件、再注册进世界（规范顺序：先 Attach 再 Register，避免注册时变换层级未就绪）。
+    Comp->AttachToComponent(AttachParent, FAttachmentTransformRules::KeepRelativeTransform);
+    Comp->RegisterComponent();
+    return Comp;
+}
+
+/**
+ * ★2026-11-01 建造特效修复：把发光 MID 设到光膜组件上。抽成独立函数以便「建造特效结束后」再次调用。
+ * 方向：材质标量 Speed = 流光速率/方向，具体正负约定由调用点按站显式传入（见 WT_EnsureGlowFogPlane）。
+ * 不再用单一全局符号反两站——两站底座朝向不同，同一符号在两站视觉方向相反，全局反号会把下载站也翻错。
+ */
+static void WT_ApplyGlowMaterial(UStaticMeshComponent* Fog, float FlowSpeed)
+{
+    if (!Fog)
+    {
+        return;
+    }
+    if (UMaterialInterface* Base = Fog->GetMaterial(0))
+    {
+        if (UMaterialInstanceDynamic* MID = Fog->CreateDynamicMaterialInstance(0, Base))
+        {
+            MID->SetScalarParameterValue(
+                TEXT("Speed"),
+                FlowSpeed);
+            Fog->SetMaterial(0, MID);
+        }
+    }
+}
+
+/**
+ * ★2026-11-01 建造特效修复：建造特效结束后再把发光 MID 设回去。
+ * 原版 SM_GlowFogPlane_01 没有「建造特效材质交换数据」（UFGBuildEffectMaterialSwapAssetData），
+ * 建造特效对它的材质 remap 会落到 mBuildEffectFallback（黑），导致中央纯黑（游戏日志可见
+ * `[BuildEffect] Failed to find remap material ... using fallback!`）。
+ * 本函数在建造特效结束（mBuildEffectIsPlaying=false）后重设发光 MID 并强制可见，消除黑屏。
+ * 自身用下一帧定时器自我重挂，直到建造特效结束才落定，避免与特效动画期间的状态互相打架。
+ */
+static void WT_GlowBuildEffectFixup(AActor* Owner, UStaticMeshComponent* Fog, bool bFlowOutward, float FlowSpeed)
+{
+    if (!IsValid(Owner) || !IsValid(Fog))
+    {
+        return;
+    }
+    AFGBuildable* BB = Cast<AFGBuildable>(Owner);
+    const bool bPlaying = BB && BB->IsPlayingBuildEffect();
+    if (bPlaying)
+    {
+        // ★施工期间保持隐藏（光膜是运行时加的组件，不参与建造特效材质交换，会以原始材质露出
+        //   一块暗色外星有机纹理方框）；下一帧再查，不落定。
+        Fog->SetVisibility(false, true);
+        Fog->SetHiddenInGame(true);
+        if (Owner->GetWorld())
+        {
+            FTimerDelegate Del;
+            Del.BindStatic(&WT_GlowBuildEffectFixup, Owner, Fog, bFlowOutward, FlowSpeed);
+            Owner->GetWorld()->GetTimerManager().SetTimerForNextTick(Del);
+        }
+        return;
+    }
+
+    // 建造特效已结束（或无特效）：重设发光 MID 并强制可见。
+    WT_ApplyGlowMaterial(Fog, FlowSpeed);
+    Fog->SetVisibility(true, true);
+    Fog->SetHiddenInGame(false);
+
+    // ★一次性运行时诊断（供用户进游戏核对修复是否生效）：确认最终材质是发光 MID 且组件可见。
+    {
+        static bool bFixupDiagDone = false;
+        if (!bFixupDiagDone)
+        {
+            bFixupDiagDone = true;
+            const float WTDirSpeed = FlowSpeed;
+            UMaterialInterface* GMat = Fog->GetMaterial(0);
+            WT_WARNF(TEXT("[glow] fixup applied mat=%s visible=%d hiddenInGame=%d Speed=%.2f %s"),
+                     GMat ? *GMat->GetName() : TEXT("<null>"),
+                     Fog->IsVisible() ? 1 : 0,
+                     Fog->bHiddenInGame ? 1 : 0,
+                     WTDirSpeed,
+                     bFlowOutward ? TEXT("OUTWARD") : TEXT("INWARD"));
+        }
+    }
+}
+
+/**
+ * ★恢复（用户 2026-10-31「现在先把云端固体站的光膜加入」+「光膜要符合上传下载的方向」）：
+ * 1:1 克隆原版位面存储站中央那块动态发光雾面片（网格 SM_GlowFogPlane_01 + 材质
+ * MM_AlienGlowPlane_01，均来自原版蓝图 SCS 节点 SM_GlowFogPlane_01），保留设计师摆好的
+ * 相对变换，让固体站也有原版那个中央蓝雾面片。
+ * 气流方向此前反复调不对，2026-11-02 用户决定直接移除气流：Speed=0 ⇒ 材质 UV 不滚动 ⇒
+ * 光膜为静止发光面（无所谓朝外/朝里）。两站统一设 0，不再逐站区分方向，也不再几何翻转。
+ * 仅固体上传/下载站调用；液体站已整体移除，不进此函数。
+ */
+
+/**
+ * ★2026-11-02：销毁一个建筑上所有「光膜相关」组件——当前名 WTCloudGlowPlane，以及 1.0.8CA 旧名
+ * WTGlowFogPlane / WTGlowFogPlaneB。供 EndPlay 与 BeginDestroy 双重兜底调用，确保无论拆解走哪条路径，
+ * 运行时光膜都不会残留（用户实测 EndPlay 单独不足以消除残留）。销毁时打一次诊断日志，便于进游戏核对。
+ */
+static void WT_DestroyGlowComponents(AActor* Owner, TObjectPtr<UStaticMeshComponent>& GlowPlane, const TCHAR* Reason)
+{
+    if (!Owner)
+    {
+        return;
+    }
+    int32 Found = 0, Destroyed = 0;
+    const bool bPointerHit = (GlowPlane != nullptr);
+    // ① 精确销毁持有指针指向的发光面片（最可靠：不依赖 GetFName 按名匹配，规避
+    //    NewObject 重名后缀 / GetFName 比较失效导致拆除后残留）。
+    if (GlowPlane)
+    {
+        ++Found;
+        GlowPlane->DestroyComponent();
+        GlowPlane = nullptr;
+        ++Destroyed;
+    }
+    // ② 兜底：任何名字以 WTCloudGlow / WTGlow 开头的残留光膜组件（兼容旧存档
+    //    WTGlowFogPlane / WTGlowFogPlaneB，以及重复创建被引擎加后缀的 WTCloudGlowPlane_N）。
+    //    不碰 WTCloudPortArrow（液体站专属，固体两站无此组件）。
+    TArray<UActorComponent*> Comps;
+    Owner->GetComponents(Comps);
+    for (UActorComponent* C : Comps)
+    {
+        if (C)
+        {
+            const FString Name = C->GetFName().ToString();
+            if (Name.StartsWith(TEXT("WTCloudGlow")) || Name.StartsWith(TEXT("WTGlow")))
+            {
+                ++Found;
+                C->DestroyComponent();
+                ++Destroyed;
+            }
+        }
+    }
+    if (Found > 0)
+    {
+        WT_WARNF(TEXT("[glow] %s glow-cleanup found=%d destroyed=%d pointerHit=%d"), Reason, Found, Destroyed, bPointerHit ? 1 : 0);
+    }
+}
+
+static UStaticMeshComponent* WT_EnsureGlowFogPlane(
+    AActor* Owner, const FVector& PortLoc, const FVector& OutDir,
+    float TargetSize, float Inset, bool bFlowOutward)
+{
+    if (!Owner)
+    {
+        return nullptr;
+    }
+
+    // 这几个参数在「1:1 克隆原版中央面片」路线下不再用于定位（原生变换已在 SCS 里摆好），
+    // 但保留签名以兼容两处调用点。显式 void 掉，避免某些引擎配置把 unused-parameter 当错。
+    (void)PortLoc; (void)OutDir; (void)TargetSize; (void)Inset;
+
+    // 旧存档可能残留 1.0.8CA 建的 WTGlowFogPlane / WTGlowFogPlaneB 组件 ⇒ **销毁**（之前只隐藏会永久残留，
+    // 且用户实测拆除后仍可见）。同时销毁任何已有 WTCloudGlowPlane，避免 BeginPlay 被多次调用时叠加多个光膜。
+    {
+        TArray<UActorComponent*> OldComps;
+        Owner->GetComponents(OldComps);
+        for (UActorComponent* C : OldComps)
+        {
+            if (C && (C->GetFName() == TEXT("WTGlowFogPlane") || C->GetFName() == TEXT("WTGlowFogPlaneB") || C->GetFName() == TEXT("WTCloudGlowPlane")))
+            {
+                C->DestroyComponent();
+                WT_WARNF(TEXT("[glow] BeginPlay destroyed legacy/pre-existing glow component %s"), *C->GetName());
+            }
+        }
+    }
+
+    // 1:1 克隆原版中央发光面片（网格 + 材质 + 相对变换全抄），挂到 RootComponent。
+    UStaticMeshComponent* Fog = WT_CloneVanillaSCSComponent(
+        Owner,
+        TEXT("/Game/FactoryGame/Buildable/Factory/CentralStorage/Build_CentralStorage.Build_CentralStorage_C"),
+        TEXT("SM_GlowFogPlane_01"),
+        Owner->GetRootComponent(),
+        TEXT("WTCloudGlowPlane"));
+    if (!Fog)
+    {
+        return nullptr;
+    }
+
+    // 位置修正（用户实测：光膜贴在背面/屁股，要求移到正面开口处）：
+    //   原版 SCS 节点 SM_GlowFogPlane_01 的相对变换是 identity（relLoc=0,relRot=0，见运行时 [glow] diag），
+    //   但其网格几何中心实测烘焙在 local(0,-465,+178)，所以 1:1 克隆后光膜落在 -Y（建筑背面/屁股）。
+    //   绕世界 Up(Z) 轴 Yaw 180° 把它镜像到 +Y（正面开口侧），同时让原本朝 -Y 的可见面转向 +Y（玩家侧）。
+    //   两站一致，不再逐站翻转（气流方向已由 Speed=0 移除）。
+    {
+        // 位置修正：原版 SCS 节点 SM_GlowFogPlane_01 几何中心烘焙在 local(0,-465,+178)，
+        // 1:1 克隆后落在 -Y（建筑背面）。绕世界 Up 轴 Yaw 180° 把它镜像到 +Y（正面开口侧），
+        // 同时让原本朝 -Y 的可见面转向 +Y（玩家侧）。
+        FTransform WT = Fog->GetRelativeTransform();
+        WT.SetRotation(FRotator(0.f, 180.f, 0.f).Quaternion());
+        // ★2026-11-02 用户实测：镜像翻转（X 缩放取负）对「同心环」图案**无视觉效果**——
+        //   同心圆角方框是 4 向对称的，镜像/旋转/翻面都不改其外观 ⇒ 已撤回该几何 hack（无效且
+        //   负缩放可能带来法线/光照副作用）。方向改由材质标量 Speed 的符号控制（见下方 FlowSpeed）。
+        Fog->SetRelativeTransform(WT);
+    }
+
+    // ★气流移除（用户最终决定）：此前反复调 Speed 正负（±1）想控制光膜朝外/朝里流动，
+    //   但同心环图案无几何手性，Speed 符号对可见方向无效；用户决定**直接移除气流** ⇒
+    //   Speed=0，光膜为静止发光面（无所谓朝外/朝里）。两站统一 0，bFlowOutward 不再驱动
+    //   光膜流动，仅保留给端口方向箭头（WT_AddPortDirectionArrow）。
+    const float FlowSpeed = 0.f;
+    WT_ApplyGlowMaterial(Fog, FlowSpeed);
+
+    // 取证日志（每个站实例打一次）：确认两站 Speed 与朝向。气流已移除 ⇒ 两站均 STATIC。
+    {
+        WT_WARNF(TEXT("[glow] dir type=%s bFlowOutward=%d Speed=%.2f => %s"),
+                 bFlowOutward ? TEXT("download") : TEXT("upload"),
+                 bFlowOutward ? 1 : 0,
+                 FlowSpeed,
+                 TEXT("STATIC(气流已移除/无流动)"));
+    }
+
+    // ★一次性运行时诊断（用户 2026-10-31「光膜不对」→「走原版效果」）：
+    //   离线 mesh 解析不可靠（该 mesh 的 uexp 是压缩的），改为让游戏把**真实**网格/包围盒/
+    //   相对变换/材质打出来，用于和原版对齐。每进程只打一条，避免刷屏。
+    {
+        static bool bGlowDiagDone = false;
+        if (!bGlowDiagDone)
+        {
+            bGlowDiagDone = true;
+            const FBoxSphereBounds GB = Fog->Bounds;
+            const FTransform GT = Fog->GetRelativeTransform();
+            UStaticMesh* GM = Fog->GetStaticMesh();
+            UMaterialInterface* GMat = Fog->GetMaterial(0);
+            // ★父级 RootComponent 的世界缩放：若它是非均匀缩放（自定义模型常被缩放对齐），
+            //   用 KeepRelativeTransform 挂上去的平面会被拉成「竖条」——这是「竖条」首要嫌疑。
+            const FVector RootScl = (Owner->GetRootComponent())
+                ? Owner->GetRootComponent()->GetComponentScale()
+                : FVector::ZeroVector;
+            WT_WARNF(TEXT("[glow] diag mesh=%s bounds(orig=%s ext=%s r=%.1f) relLoc=%s relRot=%s relScl=%s rootScl=%s mat=%s actorLoc=%s"),
+                     GM ? *GM->GetName() : TEXT("<null>"),
+                     *GB.Origin.ToString(), *GB.BoxExtent.ToString(), GB.SphereRadius,
+                     *GT.GetLocation().ToString(),
+                     *GT.GetRotation().Rotator().ToString(),
+                     *GT.GetScale3D().ToString(),
+                     *RootScl.ToString(),
+                     GMat ? *GMat->GetName() : TEXT("<null>"),
+                     *Owner->GetActorLocation().ToString());
+        }
+    }
+
+    // ★建造特效修复（2026-11-01）：原版 SM_GlowFogPlane_01 没有「建造特效材质交换数据」
+    // （UFGBuildEffectMaterialSwapAssetData），建造特效对它做材质 remap 会落到 mBuildEffectFallback
+    // （黑）⇒ 中央纯黑。若此刻建造特效正在播放，挂一个「特效结束后再重设发光 MID + 强制可见」
+    // 的自重挂定时器，确保光膜最终呈现原版整面发光，而不是被黑材质覆盖。
+    {
+        AFGBuildable* BB = Cast<AFGBuildable>(Owner);
+        if (BB && BB->IsPlayingBuildEffect() && Owner->GetWorld())
+        {
+            // 施工中：先隐藏（否则光膜以原始材质露出暗色外星纹理方框），等特效结束由 fixup
+            // 重设发光 MID 后再显示。
+            Fog->SetVisibility(false, true);
+            Fog->SetHiddenInGame(true);
+            FTimerDelegate FixupDel;
+            FixupDel.BindStatic(&WT_GlowBuildEffectFixup, Owner, Fog, bFlowOutward, FlowSpeed);
+            Owner->GetWorld()->GetTimerManager().SetTimerForNextTick(FixupDel);
+        }
+        else
+        {
+            // 无建造特效（存档载入 / 已建成）：光膜直接可见。
+            Fog->SetVisibility(true, true);
+            Fog->SetHiddenInGame(false);
+        }
+    }
+    return Fog;
+}
+
+/**
+ * ★圆孔（管道接口）方向标注（用户 2026-10-31「圆形孔【管道接口】要标注出方向」→ 选定「圆孔加静态箭头」）：
+ * 在管道口生成一个静态箭头，标出流向 —— 上传站货进云端（指向内）、下载站货出云端（指向外）。
+ * 复用原版 BuildGun 的 Arrow 网格 + 原版发光材质 MM_AlienGlowPlane_01（均既有资产，不新增材质），
+ * 与中央光膜视觉一致。
+ * 注意：Arrow 原生网格朝向未知（默认按 +X 为箭尖）。若游戏内箭头方向反了，把
+ * WT_ARROW_DIR_SIGN 翻成 -1.f（或把 MakeFromX 换成 MakeFromY）即可。
+ */
+static UStaticMeshComponent* WT_AddPortDirectionArrow(
+    AActor* Owner, const FVector& PortLoc, const FVector& OutDir, bool bFlowOutward)
+{
+    if (!Owner)
+    {
+        return nullptr;
+    }
+
+    // 防重复：已建过就跳过（BeginPlay 偶发多次时不叠箭头）。
+    {
+        TArray<UActorComponent*> Comps;
+        Owner->GetComponents(Comps);
+        for (UActorComponent* C : Comps)
+        {
+            if (C && C->GetFName() == TEXT("WTCloudPortArrow"))
+            {
+                return nullptr;
+            }
+        }
+    }
+
+    UStaticMesh* ArrowMesh = LoadObject<UStaticMesh>(
+        nullptr, TEXT("/Game/FactoryGame/Equipment/Buildgun/Mesh/Arrow.Arrow"));
+    if (!ArrowMesh)
+    {
+        return nullptr;
+    }
+    UMaterialInterface* GlowMat = LoadObject<UMaterialInterface>(
+        nullptr, TEXT("/Game/FactoryGame/Buildable/Factory/CentralStorage/Material/MM_AlienGlowPlane_01.MM_AlienGlowPlane_01"));
+
+    UStaticMeshComponent* Arrow = NewObject<UStaticMeshComponent>(Owner, TEXT("WTCloudPortArrow"));
+    if (!Arrow)
+    {
+        return nullptr;
+    }
+    Arrow->SetMobility(EComponentMobility::Movable);
+    Arrow->SetStaticMesh(ArrowMesh);
+    if (GlowMat)
+    {
+        const int32 N = ArrowMesh->GetStaticMaterials().Num();
+        for (int32 i = 0; i < N; ++i)
+        {
+            Arrow->SetMaterial(i, GlowMat);
+        }
+    }
+
+    // 箭头指向：下载站=外流（沿 +OutDir）、上传站=内流（沿 -OutDir）。
+    const float WT_ARROW_DIR_SIGN = 1.f;   // 若反向改成 -1.f
+    FVector ArrowDir = WT_ARROW_DIR_SIGN * (bFlowOutward ? OutDir : -OutDir);
+    ArrowDir.Normalize();
+    // 原生 Arrow 网格默认箭尖朝 +X ⇒ 用 X 轴对齐流向。
+    FRotator Rot = FRotationMatrix::MakeFromX(ArrowDir).Rotator();
+    // 从端口沿流向稍推出，避免埋在机身里。
+    FVector Pos = PortLoc + OutDir.GetSafeNormal() * 20.f;
+
+    const float WT_ARROW_SCALE = 2.f;       // Arrow 原生较小，放大到可见；按观感调
+    Arrow->SetRelativeLocationAndRotation(Pos, Rot);
+    Arrow->SetRelativeScale3D(FVector(WT_ARROW_SCALE));
+
+    Arrow->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    Arrow->SetGenerateOverlapEvents(false);
+    Arrow->SetCastShadow(false);
+    Arrow->bReceivesDecals = false;
+    Arrow->SetCanEverAffectNavigation(false);
+
+    Arrow->RegisterComponent();
+    Arrow->AttachToComponent(Owner->GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
+    return Arrow;
+}
+
+
+/**
  * 把主网格装到组件上。
  *
  * AFGBuildableHologram looks the placement preview geometry up through AFGBuildable::GetMainMeshes,
@@ -729,6 +1405,9 @@ static void WT_SetupMesh(AActor* Owner, UStaticMeshComponent* MeshComp, const WT
 // ----------------------------------------------------------------------------
 static const FVector  WT_VANILLA_PORT_LOC(0.f, 390.f, 100.f);
 static const FRotator WT_VANILLA_PORT_ROT(0.f, 90.f, 0.f);
+// ★2026-11-02：流体站圆口抬到门洞中心 Z=178（与中央光膜同高，门洞约 2.5m 见方 ⇒ 中心≈1.78m）。
+//   固体站传送带口仍用 WT_VANILLA_PORT_LOC（离地 1m），两者不可混用。
+static const FVector  WT_FLUID_PORT_LOC(0.f, 390.f, 178.f);
 
 static FTransform WT_ComponentToActorSpace(const USceneComponent* Comp, const AActor* Owner)
 {
@@ -1120,45 +1799,305 @@ static void WT_CopyVanillaMeshMaterials(UClass* VanillaBuildableClass, UStaticMe
 }
 
 // ----------------------------------------------------------------------------
-// ★0.2.48 圆口视觉件（用户定案 2026-10-10「建模不应该是云端建模吗」）：
+// ★★★1.0.8AT 已废弃「读包围盒算游口锚点」的方案（保留结论，不留废代码）：
 //
-// 主体保持云端建模（SM_CentralStorage_01，同固态两站），**不做任何裁剪/替换**；
-// 圆形管道口的视觉用原版「端口小件」SM_Pipe_InPut_01 叠加在管道锚点外侧。
+// 1.0.8AS 曾用 `UStaticMesh::GetBounds()` 把两个管道口推到包围盒表面外 10cm。
+//   游戏内实测取证（本局日志，`fluid up port anchor`）：
+//     mesh=SM_CentralStorage_01 extent=V(X=236.95, Y=488.82, Z=214.64)（原点 Y=-23.6）
+//   即实尺寸 473.9 x 977.6 x 429.3 uu。而这个 extent 是**四条腿 + 顶檐的外框**，
+//   主体墙面远在里面（原版方形口 390 的那个门洞一层）⇒ 游口悬在墙外约 1.1m，
+//   高度 1m 又埋在草里（用户截图实锤）。包围盒在这类「框架式建筑」上不代表墙面。
 //
-// 一手资料（`_cs_ports.py` 解析 Build_HadronCollider.uasset 实锤，编辑器格式 SCS）：
-//   原版机器的圆口 = 独立 StaticMeshComponent（FactoryInputs/Mesh/SM_Pipe_InPut_01），
-//   与管道连接组件成对摆放：
-//     Input0 连接件 (200, 990, 175) Yaw 90  ↔  SM_Pipe_InPut_01 (200, 1000, 175) Yaw 0
-//   规律：网格在连接点**向外 ~10cm**、Yaw = 连接Yaw − 90（方口件 Input1/SM_Input_01 同规律）。
-//   照抄该相对关系 ⇒ 视觉与原版一致，零坐标猜测。
+// 用户 2026-10-28 定案：就放在原版方形接口的位置（`WT_VANILLA_PORT_LOC/ROT`，
+//   = `_cs_ports.py` 解析 Build_CentralStorage.uasset 的 SCS 一手数据），并用原尺寸圆口
+//   法兰盖住那个方形门洞 —— 「移除方形接口，使用圆形接口」。
 // ----------------------------------------------------------------------------
-static void WT_AddRoundPortVisual(AActor* Self, const TCHAR* CompName, const UFGPipeConnectionComponent* Pipe)
+
+// ----------------------------------------------------------------------------
+// ★1.0.8ASb BeginPlay 取证用：**确定性**拿主网格组件。
+//   FindComponentByClass 内部遍历的是组件集合（无序），actor 上除了 WTMainMesh 还有
+//   两个圆口视觉件（WTRoundPortInA/B 也是 UStaticMeshComponent）—— 运气差会拿到
+//   SM_Pipe_InPut_01 的小包围盒，诊断行里的 mesh extent 就被污染了。
+//   修法：先按组件名 WTMainMesh 精确匹配；名字 miss 再退化为「静态网格资产包围盒
+//   最大者」（主网格必然比圆口小件大几个量级）。
+// ----------------------------------------------------------------------------
+static UStaticMeshComponent* WT_FindMainMeshComp(const AActor* Self)
 {
-    if (!Self || !Pipe || !Self->GetRootComponent())
+    if (!Self)
     {
-        return;
+        return nullptr;
     }
-    UStaticMesh* PortMesh = LoadObject<UStaticMesh>(nullptr,
-        TEXT("/Game/FactoryGame/Buildable/Factory/FactoryInputs/Mesh/SM_Pipe_InPut_01.SM_Pipe_InPut_01"));
-    if (!PortMesh)
+    UStaticMeshComponent* Best = nullptr;
+    float BestExtent = -1.f;
+    TInlineComponentArray<UStaticMeshComponent*> Comps(Self);
+    for (UStaticMeshComponent* C : Comps)
     {
-        return; // 视觉件加载失败只影响观感，管道功能不受影响（构造期不刷日志，见日志纪律）。
+        if (!C)
+        {
+            continue;
+        }
+        if (C->GetName() == TEXT("WTMainMesh"))
+        {
+            return C;   // 名字精确命中，直接用
+        }
+        // 注：UStaticMeshComponent 没有 GetBounds 成员（上一版 C2039 实锤），
+        //   包围盒一律从 UStaticMesh 资产上取 —— 与 BeginPlay 诊断行的口径一致。
+        const UStaticMesh* SM = C->GetStaticMesh();
+        const float E = SM ? SM->GetBounds().BoxExtent.GetAbsMax() : -1.f;
+        if (E > BestExtent)
+        {
+            BestExtent = E;
+            Best = C;
+        }
     }
-    UStaticMeshComponent* Port = Self->CreateDefaultSubobject<UStaticMeshComponent>(CompName);
-    if (!Port)
-    {
-        return;
-    }
-    Port->SetupAttachment(Self->GetRootComponent());
-    Port->SetStaticMesh(PortMesh);
-    Port->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    // 照抄 HadronCollider 一手相对关系：向外 10cm、Yaw = 连接Yaw − 90。
-    const FRotator ConnRot = Pipe->GetRelativeRotation();
-    const float YawRad = FMath::DegreesToRadians(ConnRot.Yaw);
-    const FVector Outward(FMath::Cos(YawRad), FMath::Sin(YawRad), 0.f);
-    Port->SetRelativeLocation(Pipe->GetRelativeLocation() + Outward * 10.f);
-    Port->SetRelativeRotation(FRotator(0.f, ConnRot.Yaw - 90.f, 0.f));
+    return Best;
 }
+
+// ----------------------------------------------------------------------------
+// 1.0.8AV 可复用「圆形管道接口」：自建建模 + 一体化程序配置
+//
+// 一手依据（为什么必须自己做模型、不能拿原版件硬盖）：
+//   · 方形门洞**焊在 MainMesh 本体里**：`_cs_ports.py` 解 Build_CentralStorage.uasset，
+//     SCS 只有 Input0(传送带口) + FGFactoryLegs + 3 mesh + 4 梯子，没有独立方口组件，删不掉。
+//   · 原版 `SM_Pipe_InPut_01` 是粒子加速器的粗管法兰（运行时实测 extent 直径 199.6uu≈2m、
+//     内孔约 1.5m），套在普通管道(~1m)上既太大又盖不住门洞。用户 2026-10-28 定案
+//     「为什么要去盖住？直接制作新的建模不就行了？」
+//
+// 自建网格：`/Smart_Factory/PortMesh/SM_PipePort_01`
+//   由编辑器内 GeometryScript 程序化生成（脚本 C:/SMLDev/make_port_mesh.py，11s 跑完）
+//     = 法兰圆盘(Ø290) ∪ 管颈(Ø150) − 内孔(Ø110)
+//   尺寸：法兰 Ø290uu(2.9m) / 通孔 Ø110uu(1.1m，适配原版管道 ~1m) / 法兰厚 25 / 管颈 60 / 32 段
+//   约定：**网格原点 = 法兰前表面中心，管口朝 +Z**（装配器就按这个约定摆位）
+//
+// 程序配置（大世界复用的入口）：
+//   `FWTPipePortSpec` + `WT_AddRoundPipePort` 一次调用同时建好
+//     · 管道连接组件（位置/朝向/类型/间隙）
+//     · 视觉法兰（位置/朝向/缩放/外推量，材质继承主网格）
+//   任何新建筑只要给一个 Spec 就能长出合规圆口；换规格只改 Spec 里的数。
+// ----------------------------------------------------------------------------
+
+// 视觉件沿管口方向的外推量（uu）：接口点 (0,390,100) 贴着墙面，
+// 不外推会整块埋进 MainMesh 里看不见。1.0.8AU 那版法兰前表面落到 Y=473 时用户能看清整个口，
+// 现在取 80 ⇒ 前表面 Y=470，与那版齐平（用户已验证过这个深度不会显得悬空）。
+// **外观要微调就只改这一个数**（BeginPlay 会把 portLoc / 世界包围盒 / 材质名打进日志，一次对准）。
+static constexpr float WT_PORT_VISUAL_PUSH = 80.f;
+
+// ★1.0.8AY 圆口与机身的几何实现已抽到 `WTPortKit.h`
+//   （单头文件工具箱，可整个文件拷到其它 Satisfactory mod 复用，接入说明见该文件头注释）。
+
+// ----------------------------------------------------------------------------
+// ★1.0.8BQ 原版方形口实测量（用户 2026-10-29 定案原话：「先找到原版的方形口的四条边的
+//   中心点，然后以四条边中心点为初始位置形成一个圆形，则就是液体输入口，且适配原版
+//   管道横截面大小」）。
+//
+// 原理（全部本局世界坐标实测，不再信任何硬编码 —— 1.0.8BP「Ø2.9m 法兰盖不严、漏出
+//   Mercer 球」的教训：bounding 推出来 wallY=512、旧口径门面 470，跟真实开口对不上）：
+//   BeginPlay（游戏线程）从站体正前方对前脸打**网格射线**（bTraceComplex）：
+//   ★1.0.8BR 修正：1.0.8BQ 用 World->LineTraceSingleByChannel + AddIgnoredActor(Self)
+//   —— 实测 864 格全线打空（bin hits=0/864）：AddIgnoredActor 忽略的是自身 actor 的
+//   **全部组件**，恰恰包括要测的原版主网格 ⇒ 测量永远失败回落兜底（用户截图实锤）。
+//   改用 `UPrimitiveComponent::LineTraceComponent`（PrimitiveComponent.h:3001）**只对
+//   VanillaMesh 一个组件打**：雾面片/Mercer 球/其它建筑天然不参与，无需忽略任何人。
+//   · 命中点 Y 聚在同一平面 ⇒ 实体墙面；出现次数最多的 10uu 档 = 门面平面（众数比均值
+//     抗凸起细节，门面是前脸最大的一块平面）；
+//   · 命中点明显更靠里（或打空）⇒ 该格落在开口里。
+// 开口格的 min/max X/Z = 方形口四条边；四条边中点 → 内切圆：
+//   圆心 = ((minX+maxX)/2, (minZ+maxZ)/2)，半径 = min(HalfX, HalfZ)。
+// ----------------------------------------------------------------------------
+struct FWTSquareOpeningMeasure
+{
+    bool  bFound  = false;
+    float CenterX = 0.f;    // 开口中心 X（actor 空间）
+    float CenterZ = 0.f;    // 开口中心 Z（actor 空间；actor 原点在建筑底部，Z 0..429）
+    float HalfX   = 0.f;    // 开口半宽
+    float HalfZ   = 0.f;    // 开口半高
+    float WallY   = 0.f;    // 门面平面 Y（actor 空间，开口四周实体面的众数档）
+    // ★1.0.8CG：圆口圆盘足迹（Ø200）内最浅腔内面（背板/机内壁）——「往里缩」的硬边界。
+    float BackY   = 0.f;    // 足迹内开口格的最浅命中 Y（actor 空间）；仅 bBack 时有效
+    bool  bBack   = false;  // 足迹内测到过开口格才 true（bFound 且圆盘压到开口）
+    float RecessDepth = 0.f; // 开口最大进深（门面到腔体最背壁，actor 空间；through 封顶 300）
+};
+
+static FWTSquareOpeningMeasure WT_MeasureSquareOpening(AActor* Self,
+                                                       UStaticMeshComponent* VanillaMesh,
+                                                       float HintWallY)
+{
+    FWTSquareOpeningMeasure Out;
+    UWorld* World = Self ? Self->GetWorld() : nullptr;
+    if (!World || !Self || !VanillaMesh)
+    {
+        return Out;
+    }
+
+    const FTransform& ActorXf = Self->GetActorTransform();
+    const float YStart = HintWallY + 200.f;   // 起点：墙前 2m（actor 空间）
+    const float YEnd   = HintWallY - 500.f;   // 终点：穿墙深入机内 5m
+
+    struct FSample { float X, Z, HitY; };
+    TArray<FSample> Samples;
+    Samples.Reserve(1024);
+    TMap<int32, int32> Hist;                  // 10uu 档 → 命中数
+
+    // ★1.0.8BR：只对原版主网格组件打射线（bTraceComplex 走渲染网格精度）。
+    //   不再用 World trace + AddIgnoredActor —— 那会把要测的墙自己也忽略掉，
+    //   实测 864 格全线打空（1.0.8BQ 用户截图+日志实锤）。
+    //   LineTraceComponent 对组件 BodyInstance 查询：Mercer 球/雾面片/别的建筑天然不参与。
+    FCollisionQueryParams Params(TEXT("WTMeasureOpening"), /*bTraceComplex=*/true);
+
+    const float Step = 15.f;
+    int32 Total = 0;
+    for (float Z = 15.f; Z <= 415.f; Z += Step)
+    {
+        for (float X = -235.f; X <= 235.f; X += Step)
+        {
+            ++Total;
+            const FVector SWorld = ActorXf.TransformPosition(FVector(X, YStart, Z));
+            const FVector EWorld = ActorXf.TransformPosition(FVector(X, YEnd, Z));
+            FHitResult Hit;
+            if (VanillaMesh->LineTraceComponent(Hit, SWorld, EWorld, Params))
+            {
+                const FVector HitLocal = ActorXf.InverseTransformPosition(Hit.ImpactPoint);
+                Samples.Add({ X, Z, (float)HitLocal.Y });
+                ++Hist.FindOrAdd(FMath::RoundToInt((float)HitLocal.Y / 10.f));
+            }
+            else
+            {
+                // 完全打空 = 开口正后方也没东西，按开口处理（Y 记为终点，绝不进墙面档）。
+                Samples.Add({ X, Z, YEnd - 100.f });
+            }
+        }
+    }
+    if (Samples.Num() < 32)
+    {
+        WT_WARNF(TEXT("[portmeasure] only %d/%d samples hit-eligible -> measure FAILED"),
+                 Samples.Num(), Total);
+        return Out;
+    }
+
+    // 门面平面 = 命中最多的 10uu 档（众数）。
+    int32 BestBin = 0, BestCount = 0;
+    for (const TPair<int32, int32>& KV : Hist)
+    {
+        if (KV.Value > BestCount)
+        {
+            BestCount = KV.Value;
+            BestBin = KV.Key;
+        }
+    }
+    Out.WallY = BestBin * 10.f;
+
+    // 开口格：命中比门面平面明显靠里（阈值 60uu，吃掉墙面浮雕噪声）。
+    constexpr float kOpenDepth = 60.f;
+    constexpr float kBig = UE_BIG_NUMBER;
+    float MinX = kBig, MaxX = -kBig;
+    float MinZ = kBig, MaxZ = -kBig;
+    int32 OpenPts = 0;
+    for (const FSample& S : Samples)
+    {
+        if (S.HitY < Out.WallY - kOpenDepth)
+        {
+            ++OpenPts;
+            MinX = FMath::Min(MinX, S.X);  MaxX = FMath::Max(MaxX, S.X);
+            MinZ = FMath::Min(MinZ, S.Z);  MaxZ = FMath::Max(MaxZ, S.Z);
+        }
+    }
+    Out.CenterX = (MinX + MaxX) * 0.5f;
+    Out.CenterZ = (MinZ + MaxZ) * 0.5f;
+    Out.HalfX   = (MaxX - MinX) * 0.5f;
+    Out.HalfZ   = (MaxZ - MinZ) * 0.5f;
+
+    // ★1.0.8CU：开口最大进深（门面到腔体最背壁），through 封顶 300。
+    {
+        float MinOpenY = kBig;
+        for (const FSample& S : Samples)
+        {
+            if (S.HitY < Out.WallY - kOpenDepth) MinOpenY = FMath::Min(MinOpenY, S.HitY);
+        }
+        Out.RecessDepth = (MinOpenY < kBig) ? FMath::Min(Out.WallY - MinOpenY, 300.f) : 0.f;
+    }
+
+    // 尺寸合理性门禁：开口必须存在且在"一个门洞"量级（格距 15 ⇒ 半尺寸至少吃 4 格）；
+    //   众数档至少 20 格命中 —— 防"全线打空（碰撞未注册/被忽略）⇒ WallY=0、全网格被当
+    //   开口"的假绿路径：没有可信的墙面平面就一律回落硬编码兜底。
+    //   上限 210/180（行为推演反例3 实锤：235/210 放得过宽，"整面墙都空"会溜进去）。
+    Out.bFound = BestCount >= 20 &&
+                 OpenPts >= 12 && Out.HalfX >= 60.f && Out.HalfZ >= 60.f &&
+                 Out.HalfX <= 210.f && Out.HalfZ <= 180.f;
+
+    // ★1.0.8CG：圆口圆盘足迹内最浅腔内面。移植网格 Ø200（半径 100，BU bounds 实锤），
+    //   中心 = (CenterX, CenterZ-46)（46 = 1.0.8CE 眼调下移量；改那个数这里同步改）。
+    //   足迹内开口格（比门面深 60+）的最浅命中 = 鼓身往里收会顶到的第一道面 ⇒ 退距硬边界。
+    if (Out.bFound)
+    {
+        constexpr float kMeshR = 105.f;   // 网格半径 100 + 5 余量
+        const float PortCx = Out.CenterX;
+        const float PortCz = Out.CenterZ - 46.f;
+        float BackY = -kBig;
+        int32 BackCells = 0;
+        for (const FSample& S : Samples)
+        {
+            if (S.HitY >= Out.WallY - kOpenDepth) continue;   // 只看开口格（打空的极深格不影响 max）
+            const float Dx = S.X - PortCx;
+            const float Dz = S.Z - PortCz;
+            if (Dx * Dx + Dz * Dz > kMeshR * kMeshR) continue;
+            BackY = FMath::Max(BackY, S.HitY);
+            ++BackCells;
+        }
+        if (BackCells > 0)
+        {
+            Out.BackY = BackY;
+            Out.bBack = true;
+            WT_WARNF(TEXT("[portmeasure] 1.0.8CG disc backY=%.1f (depth %.1f from wall, cells=%d)"),
+                     Out.BackY, Out.WallY - Out.BackY, BackCells);
+        }
+    }
+
+    // ★1.0.8CU：[portmap] 逐行开口深度地图 —— 一口实锤「方形开口」真实形状：
+    //   逐 Z 行扫描开口格（HitY < WallY - kOpenDepth），输出该行的 void X 段与进深，
+    //   用于区分「连通框形(每行都有 void)」vs「四角孤立洞(仅极端 Z 行有 void)」，
+    //   从而决定遮板是填整框还是只填四角。绝不靠截图猜。
+    if (Out.bFound)
+    {
+        constexpr float kRow = 15.f;
+        int32 VoidRows = 0;
+        for (float Z = 15.f; Z <= 415.f; Z += kRow)
+        {
+            float RowMinX = kBig, RowMaxX = -kBig, RowDepth = 0.f;
+            bool bRowVoid = false;
+            for (const FSample& S : Samples)
+            {
+                if (FMath::Abs(S.Z - Z) > kRow * 0.5f) continue;
+                if (S.HitY < Out.WallY - kOpenDepth)
+                {
+                    bRowVoid = true;
+                    RowMinX = FMath::Min(RowMinX, S.X);
+                    RowMaxX = FMath::Max(RowMaxX, S.X);
+                    RowDepth = FMath::Max(RowDepth, Out.WallY - S.HitY);
+                }
+            }
+            if (bRowVoid)
+            {
+                ++VoidRows;
+                WT_WARNF(TEXT("[portmap] Z=%3.0f voidX[%6.0f..%6.0f] depth=%4.0f"), Z, RowMinX, RowMaxX, RowDepth);
+            }
+        }
+        WT_WARNF(TEXT("[portmap] 1.0.8CU summary wallY=%.0f portCenter=(%.0f,%.0f) rows=%d"),
+                 Out.WallY, Out.CenterX, Out.CenterZ - 46.f, VoidRows);
+    }
+
+    WT_WARNF(TEXT("[portmeasure] wallY=%.0f (bin hits=%d/%d) opening pts=%d/%d "
+                  "edges X[%.0f..%.0f] Z[%.0f..%.0f] center=(%.0f,%.0f) half=(%.0f,%.0f) found=%d"),
+             Out.WallY, BestCount, Total, OpenPts, Total,
+             MinX, MaxX, MinZ, MaxZ, Out.CenterX, Out.CenterZ, Out.HalfX, Out.HalfZ,
+             Out.bFound ? 1 : 0);
+    WT_WARNF(TEXT("[portmeasure] 1.0.8BR trace=component(LineTraceComponent vs vanilla mesh)"));
+    return Out;
+}
+
+
+
+
+
 
 // ----------------------------------------------------------------------------
 // 储能单元
@@ -1166,6 +2105,10 @@ static void WT_AddRoundPortVisual(AActor* Self, const TCHAR* CompName, const UFG
 
 AWTUpgradePowerStorage::AWTUpgradePowerStorage()
 {
+    // ★★★1.0.7 面板标题修复（同 AWTUpgradeStorage ctor 的详细说明）：纯 C++ 建筑必须在构造函数里
+    //   写 AFGBuildable::mDisplayName，否则复用原版面板时标题栏是空的。
+    mDisplayName = GetDisplayName();
+
     // ★0.2.48 充电动画：打开 Tick，把充电状态/电量百分比写成网格自定义图元数据（节流 4Hz 足够顺滑）。
     PrimaryActorTick.bCanEverTick = true;
     PrimaryActorTick.TickInterval = 0.25f;
@@ -1232,10 +2175,12 @@ AWTUpgradePowerStorage::AWTUpgradePowerStorage()
     //     落在**容量**上；并不存在"放电速率"字段需要改。唯一要乘的就是下面这两个基础值。
     //   ★铁律：只能写「基础值 × 倍率」，绝不能写「当前值 × 倍率」。基础值只在这一处定义，
     //     实际部署值 = 基础值 × 玩家研究等级倍率，在 BeginPlay 里算（见下）。
-    //   ★0.2.48 用户定案：基础**蓄电容量 400 → 1600** MWh（原版 100 的 16×；充放速率仍 400 MW = 4×）。
+    //   ★0.2.48 用户定案：基础**蓄电容量 400 → 1600** MWh（原版 100 的 16×）。
+    //   充电速率（mPowerInputCapacity）见下方 2026-11-07 定案，改按里程碑档位固定上限（不再 400×等级倍率）。
     WT_SetFloatProperty(this, TEXT("mPowerStoreCapacity"), 1600.f);
-    // 最大输入（充电）功率：原版 100 MW × 4 = 400 MW（本回合未改）。
-    WT_SetFloatProperty(this, TEXT("mPowerInputCapacity"), 400.f);
+    // 最大输入（充电）功率：2026-11-07 定案改为「按里程碑档位固定上限」，默认值取档位 0（Lv1~4）= 200 MW；
+    // 实际值由 BeginPlay 的 ApplyResearchedCapacity 按当前研究档位经 WT_PowerStorageChargeCapMW 覆盖写入。
+    WT_SetFloatProperty(this, TEXT("mPowerInputCapacity"), 200.f);
 
     // ★0.2.36 崩溃修复：原版把 mIndicatorLevelMax（uint8，侧面的电量格数）写在蓝图
     //   Build_PowerStorageMk1 里，C++ CDO 默认 0 —— 而 AFGBuildablePowerStorage::BeginPlay 的
@@ -1346,21 +2291,42 @@ AWTUpgradePowerStorage::AWTUpgradePowerStorage()
     }
 }
 
+void AWTUpgradePowerStorage::ApplyResearchedCapacity()
+{
+    // 研究等级可能已变（先放后研究）。电力系统实时读 mPowerStoreCapacity / mPowerInputCapacity，
+    // 运行时改写即生效 —— 解决「研究后空提升」。
+    const int32 L = WT_GetTrackLevel(GetWorld(), EWTUpgradeTrack::PowerStorage);
+    // ★2026-11-07 修「研究前依旧是 2000」：`WT_GetTrackLevel` 在**什么都没研究**时兜底返回 1
+    //   （不是真的 Lv1），而 `WT_TrackScale` 又把 Level<1 钳成 1（1.25×）⇒ 未研究电池被算成
+    //   1600×1.25 = 2000。电池建筑由 T3 里程碑解锁、与 MAM 等级轨是两套 ⇒「有建筑但没研究」
+    //   是常态。这里显式判定本轨是否**真的研究过**：没研究 → 基础倍率 1.0（1600）；
+    //   研究过才乘等级倍率（Lv1 = 1600×1.25 = 2000，与设计「前移一级」一致）。
+    const bool bResearched = WT_IsTrackResearched(GetWorld(), EWTUpgradeTrack::PowerStorage);
+    // ★2026-11-08 百位取整：实际储电量与展示名共用同一数据源 WT_PowerStorageMWh（已按百位四舍五入）。
+    //   未研究 → 基础 1600 MWh；研究过 → 该等级取整后储电量。
+    const float Cap = bResearched
+        ? (float)WT_PowerStorageMWh(L, WT_GetFinalRoute(GetWorld()))
+        : 1600.f;
+    // ★2026-11-07 充电速率定案：充电上限改「按里程碑档位固定」(Lv1~4=200 … Lv17~20=5000 MW)，
+    // 不再随等级 ×1.25 暴涨（Lv20≈34.7GW 任何电网都供不上）；储电量 Cap 仍 = 1600 × 等级倍率（已取整）。
+    const float Inp = WT_PowerStorageChargeCapMW(L);
+    WT_SetFloatProperty(this, TEXT("mPowerStoreCapacity"), Cap);
+    WT_SetFloatProperty(this, TEXT("mPowerInputCapacity"), Inp);
+    // ★诊断：未研究（bResearched=false）与 L>1 都打一条，便于验收「研究前=1600 / Lv1=2000」。
+    if (L > 1 || !bResearched)
+    {
+        WT_WARNF(TEXT("[wt-upg-batt] %s Lv%d researched=%d -> mPowerStoreCapacity=%.0f MWh"),
+                 *GetName(), L, bResearched ? 1 : 0, Cap);
+    }
+}
+
 void AWTUpgradePowerStorage::BeginPlay()
 {
     Super::BeginPlay();
 
-    // Scale by the player's researched PowerStorage level (Dyson-sphere style progression). The base
-    // (level 1) values above are the floor; each researched level multiplies capacity + charge rate.
-    const int32 L = WT_GetTrackLevel(GetWorld(), EWTUpgradeTrack::PowerStorage);
-    // ★末段（Lv17~20）碎片路线是 1.5 倍增量外推，必须把玩家实际走的路线一起传进来。
-    const float s = WT_TrackScale(EWTUpgradeTrack::PowerStorage, L, WT_GetFinalRoute(GetWorld()));
-    // ★0.2.48：基础**蓄电容量 1600** MWh（原版 100 的 16×，用户 400→1600 定案）/ 充放速率 400 MW（原版 100 的 4×），
-    //   此处**只乘等级倍率**。写「基础值 × 倍率」而不是「当前值 × 倍率」，否则同一实例被 BeginPlay 跑两次就会平方放大。
-    WT_SetFloatProperty(this, TEXT("mPowerStoreCapacity"), 1600.f * s);
-    WT_SetFloatProperty(this, TEXT("mPowerInputCapacity"), 400.f * s);
-    WT_LOGF(TEXT("[upgrade] power storage Lv%d -> %.0f MWh / %.0f MW charge (base 1600/400)"),
-            L, 1600.f * s, 400.f * s);
+    // 按当前研究等级套用电池容量（基础 1600 MWh / 400 MW × 等级倍率）。封装成 ApplyResearchedCapacity，
+    // 使「先放后研究」时研究推进脉冲也能调它重新套用 —— 解决研究后空提升。
+    ApplyResearchedCapacity();
 
     // ★0.2.48 J 修复（v2，用户实测「无充电动画」+「重载丢失材质」）：
     //   不再依赖原版 proxy mMeshMesh 渲染 —— 实例管理器在组件注册期就接管其渲染，运行时改网格/
@@ -1490,6 +2456,14 @@ FText AWTUpgradePowerStorage::GetDisplayName()
 
 AWTUpgradeStorage::AWTUpgradeStorage()
 {
+    // ★★★1.0.7（用户 2026-10-27 截图对比「原版面板左上角有『位面存储站上传器』，我们只有图标」）：
+    //   原版面板标题 / 瞄准提示 / 拆解提示读的都是 **AFGBuildable::mDisplayName**
+    //   （FGBuildable.h:824，`UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)`）。原版建筑在蓝图 CDO 里
+    //   配了它；我们是纯 C++ 类，从没赋过值 ⇒ 空 FText ⇒ 复用同一块原版面板时标题栏只剩图标。
+    //   在构造函数里赋一次 = 写 CDO 默认值，EditDefaultsOnly 属性会复制给每个实例，不必每实例重设。
+    //   中文/英文都走 GetDisplayName() 里那条 WT_LOCTEXT，和建造菜单用的是同一个 key。
+    mDisplayName = GetDisplayName();
+
     // ★0.2.36b 需要自己的 Tick 把本地缓冲搬进账本（原版上传链路全部拦死，见 Tick/Factory_Tick）。
     //
     // ★★0.2.36c 加载期修复：**必须**同时打开 bStartWithTickEnabled。
@@ -1556,7 +2530,11 @@ AWTUpgradeStorage::AWTUpgradeStorage()
     {
         VanillaDepot->AddToRoot();
         WT_CopyVanillaMeshMaterials(VanillaDepot, MeshComp);
-        WT_ReuseVanillaInteractWidget(this, VanillaDepot);
+        // ★1.0.7z 上传站改用自己的面板（用户 2026-10-27 定案：「我们的云端上传站也采用此UI即可，
+        //   输出就不显示【更换/选择】」）。仍走上面这条 vanilla-depot 分支拿材质/端口，
+        //   只把「按 E 打开哪个面板」换成 UWTItemSelectPanelWidget —— 它靠 mInteractObject
+        //   的实际类型判断是上传站模式（不建行尾按钮列、标题换口径，见 GetIsUploaderStation）。
+        WT_UseNativeInteractPanel(this, UWTItemSelectPanelWidget::StaticClass());
 
         // ★0.2.48 接口位置 = 原版那个口（唯一入口，见 WT_PlaceOnVanillaPort 的说明）。
         WT_PlaceOnVanillaPort(mConveyorIn, VanillaDepot,
@@ -1582,88 +2560,341 @@ AWTUpgradeStorage::AWTUpgradeStorage()
     ApplyStorageGrid();
 }
 
+void AWTUpgradeStorage::ApplyResearchedCapacity()
+{
+    // 容量 = 本地缓冲格网。ApplyStorageGrid 把 mInventorySizeX/Y 设成当前研究等级对应的尺寸，
+    // 但已放置建筑的库存是在 BeginPlay 按当时尺寸建的，改字段不会自动重建 —— 必须 Resize 现有库存。
+    // 只扩不缩（研究只升不降），Resize 保留已有货物（同下载站自愈逻辑）。
+    ApplyStorageGrid();
+    if (UFGInventoryComponent* Inv = GetStorageInventory())
+    {
+        UFGInventoryComponent* Target = Inv;
+        FString How;
+        if (UFGInventoryComponent* Active = WT_ResolveActiveStorageInventory(this, How))
+        {
+            Target = Active;
+        }
+        const int32 Need = mInventorySizeX * mInventorySizeY;
+        if (Target->GetSizeLinear() < Need)
+        {
+            Target->Resize(Need);
+            WT_WARNF(TEXT("[upgrade] storage '%s' capacity grown to %dx%d=%d slots (was %d)."),
+                     *GetName(), mInventorySizeX, mInventorySizeY, Need, Target->GetSizeLinear());
+        }
+    }
+}
+
 void AWTUpgradeStorage::BeginPlay()
 {
-    Super::BeginPlay();
+    // ★★★1.0.7 顺序修复（用户 2026-10-27 定案「缓冲改成 1×1 起步」时一并处理）：
+    //   `ApplyStorageGrid()` 必须排在 `Super::BeginPlay()` **之前** ——
+    //   原版 `AFGBuildableStorage::BeginPlay()` 就是在那里面用 `mInventorySizeX/Y`
+    //   把 `mStorageInventory` 建出来的（FGBuildableStorage.h:56）。放在 Super 之后只能改字段、
+    //   改不动已经建好的库存 ⇒ 高研究等级也会退化成 CDO 那 1×1（旧注释把这当成"已知限制"，
+    //   实际只要挪个顺序就好了）。★对**已存在的老存档建筑**仍然无效（库存随存档尺寸走，
+    //   要吃到新网格得拆了重建），这条限制无法绕开。
     ApplyStorageGrid();
+    Super::BeginPlay();
     WT_LogConnectionPorts(this, TEXT("ports-depot"));   // ★0.2.42 接口可见性取证
 
-    // ★0.2.32 取证：基类换成原版 AFGCentralStorageContainer（位面存储站上传器）；
-    //   ★0.2.36b：注册照旧由基类完成（我们仍是"合法云端节点"，让建造取料有云可用），
-    //   但上传路径改为自己的账本 —— 见 Factory_Tick。
+    // ★1.0.8BK 补上原版云端站中间那块动态发光雾面片（用户 2026-10-28「这里原版有个动态
+    //   视觉效果，我们没有」）。四座云端站统一补，逻辑见 WT_EnsureGlowFogPlane。
+    //   本类 = 固体上传站：口在 WT_VANILLA_PORT_LOC、朝 +Y；门洞约 2.5m 见方（原版面片 1:1 大小）。
+    mGlowPlane = WT_EnsureGlowFogPlane(this, WT_VANILLA_PORT_LOC, FVector(0.f, 1.f, 0.f),
+                                       /*TargetSize=*/250.f, /*Inset=*/8.f, /*bFlowOutward=*/false);
+
+    // ★1.0.8（2026-10-31 用户修正）：箭头是**液体站专属**，固体站不加箭头。
+    //   （WT_AddPortDirectionArrow 保留定义，供日后液体上传/下载站复用；此处不调用。）
+
+    // ★1.0.6（「传送带输入不进去」修复）：ctor 里调过一次 SetInventory，但那是在**构造期**——
+    //   此时 `GetStorageInventory()` 拿到的子对象尚未注册，而 SetInventory 是游戏侧的非 inline
+    //   实现（BlueprintCallable），不同版本对「构造期传入未注册库存」的处理不一定可靠。
+    //   实测症状正是：口在、方向对、传送带也连上了，但货死活进不来（= 连接组件的
+    //   mConnectionInventory 为 null）。这里在 BeginPlay 再绑一次——幂等操作，
+    //   已经绑好的情况下重复设置没有任何副作用。
+    if (mConveyorIn)
+    {
+        mConveyorIn->SetInventory(GetStorageInventory());
+        mConveyorIn->SetDirection(EFactoryConnectionDirection::FCD_INPUT);
+
+        // 绑定结果必须能在 Shipping 日志里核对：dir 必须是 0(FCD_INPUT)，
+        // bound 必须是 yes。若 bound=NO，说明 SetInventory 本身失败，
+        // 那就要走「自建库存 + 每帧搬运」的兜底路线，不能再靠这个端口。
+        WT_WARNF(TEXT("[upgrade] depot '%s' conveyor input rebind: dir=%d bound=%s (storageInv=%s)"),
+                 *GetName(),
+                 static_cast<int32>(mConveyorIn->GetDirection()),
+                 mConveyorIn->GetInventory() ? TEXT("yes") : TEXT("NO"),
+                 GetStorageInventory() ? TEXT("yes") : TEXT("NO"));
+    }
+    else
+    {
+        WT_ERRF(TEXT("[upgrade] depot '%s' has NO conveyor input component at BeginPlay."), *GetName());
+    }
+
+    // ★1.0.6 取证：注册由基类 BeginPlay 完成（我们仍是"合法云端节点"）。
+    //   这里补一条**地基级**诊断：云端子系统能否拿到。拿不到 ⇒ 上传整条链都是空转，
+    //   而这条链一旦断，症状恰好又是「货进去就没了」，必须能在 Shipping 日志里一眼看出来。
+    AFGCentralStorageSubsystem* CloudSub = GetWorld() ? AFGCentralStorageSubsystem::Get(GetWorld()) : nullptr;
+    WT_WARNF(TEXT("[upgrade] depot '%s' centralStorageSubsystem=%s centralStorageBuilt=%s"),
+             *GetName(),
+             CloudSub ? TEXT("ok") : TEXT("NULL"),
+             (CloudSub && CloudSub->IsCentralStorageBuilt()) ? TEXT("yes") : TEXT("no"));
+
     int32 LedgerTotal = 0;
     for (const FItemAmount& IA : mLedger)
     {
         LedgerTotal += IA.Amount;
     }
-    WT_LOGF(TEXT("[upgrade] depot '%s' grid %dx%d (%d slots) ownLedger=%d entries / %d items."),
-            *GetName(), mInventorySizeX, mInventorySizeY, mInventorySizeX * mInventorySizeY,
-            mLedger.Num(), LedgerTotal);
+    // 老存档迁移量必须可见（旧版把货黑洞在账本里，玩家要能看到还剩多少没迁出去）。
+    // ★1.0.7：加 liveSlots —— 声明值(mInventorySizeX*Y)和**实际建出来的库存格数**可能不一致
+    //   （取决于原版是否照我们在 Super 之前设的值建库）。实测就盯这一项：期望 1x1 时 liveSlots=1。
+    const int32 LiveSlots = GetStorageInventory() ? GetStorageInventory()->GetSizeLinear() : -1;
+    WT_WARNF(TEXT("[upgrade] depot '%s' grid %dx%d (%d slots, liveSlots=%d) legacyLedger=%d entries / %d items."),
+             *GetName(), mInventorySizeX, mInventorySizeY, mInventorySizeX * mInventorySizeY, LiveSlots,
+             mLedger.Num(), LedgerTotal);
+}
+
+void AWTUpgradeStorage::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    // ★2026-11-02（用户截图反馈：拆除固体上传站后残留一块带外星纹理方块）：
+    // WT_EnsureGlowFogPlane() 在 BeginPlay 经 NewObject 加的发光面片组件（WTCloudGlowPlane）
+    // 实测拆除后会残留。EndPlay + BeginDestroy 双重兜底销毁；诊断日志见 WT_DestroyGlowComponents。
+    WT_DestroyGlowComponents(this, mGlowPlane, TEXT("storage EndPlay"));
+    Super::EndPlay(EndPlayReason);
+}
+
+void AWTUpgradeStorage::BeginDestroy()
+{
+    // ★2026-11-02：EndPlay 兜底——若拆解路径未触发 EndPlay，BeginDestroy 必然触发，确保光膜组件被销毁。
+    WT_DestroyGlowComponents(this, mGlowPlane, TEXT("storage BeginDestroy"));
+    Super::BeginDestroy();
+}
+
+void AWTUpgradeStorage::Dismantle_Implementation()
+{
+    // ★2026-11-02（用户截图：拆除过程中露原始外星纹理方块）：拆除走**独立拆除特效**
+    //   （Dismantle_Implementation → NetMulticast_Dismantle → PlayDismantleEffect → UFGMaterialEffect_Build），
+    //   会把建筑所有网格套上拆除材质；我们的运行时发光面片不参与建造/拆除材质交换，于是以原始
+    //   外星纹理露出（=截图那块暗色细胞纹理方块）。在拆除真正开始（本函数入口）先销毁光膜，
+    //   让随后的拆除特效不再把它纳入网格集合 ⇒ 拆除全程无残留。之后 EndPlay/BeginDestroy 再清一次（幂等）。
+    WT_DestroyGlowComponents(this, mGlowPlane, TEXT("storage Dismantle"));
+    Super::Dismantle_Implementation();
 }
 
 void AWTUpgradeStorage::Tick(float dt)
 {
-    WT_ZONE(TEXT("Upgrade.Storage.Tick"));   // 0.5s 一次；本地缓冲 -> 账本
-    // ★0.2.36b：故意不调 Super —— 原版 AFGBuildableStorage/Container 的 Tick/上传链路
-    // 会把库存直接送进原版云端池，绕过我们的账本（"原版优先"就无从谈起）。
-    DrainInventoryToLedger();
+    WT_ZONE(TEXT("Upgrade.Storage.Tick"));   // 0.5s 一次：原版上传 + 自己的加速推进
+
+    // ★1.0.6（消失 bug 修复）：**恢复**调 Super —— 原版 AFGCentralStorageContainer 的 Tick
+    //   负责累积 mUploadTimer、跑 CanUploadItem/TryUploadItem、驱动面板的上传进度条。
+    //   旧版这里刻意不调 Super（为了把货截进自己的账本），代价是货进了玩家看不见的地方。
+    Super::Tick(dt);
+
+    PumpBufferToCentralStorage();
 }
 
 void AWTUpgradeStorage::Factory_Tick(float dt)
 {
-    // 同上：原版的上传如果走 Factory_Tick 这条路，这里一并拦死。
-    DrainInventoryToLedger();
+    // ★★★1.0.7 崩溃修复（2026-10-27 实测 Crash 的根因，一手 callstack 见下）：
+    //   **绝对不能在这里调 PumpBufferToCentralStorage()！**
+    //
+    //   原版 `AFGBuildableSubsystem::TickFactoryActors` 是用 `ParallelFor` **并行**回调各建筑的
+    //   `Factory_Tick`（FGBuildableSubsystem.cpp:644 那个 ParallelForInternal），也就是跑在
+    //   LowLevelTasks 的工作线程上、**不是游戏线程**。而
+    //   `AFGCentralStorageSubsystem::UploadItemFromInventoryToCentralStorage()`
+    //   （FGCentralStorageSubsystem.cpp:97）内部会立刻
+    //     → `Client_ItemAmountUpdatedInCentralStorage()`（同文件 :321）
+    //       → 广播 `mOnCentralStorageItemAmountUpdated` 多播委托
+    //         → `AFGCharacterPlayer::OnCentralStorageItemAmountUpdated`
+    //           → `UFGShoppingListComponent::UpdateShoppingList()`（FGShoppingListComponent.cpp:493）
+    //             → `FTimerManager::FindTimer()` → `check(IsInGameThread())` ⇒ **引擎断言崩溃**
+    //
+    //   崩溃栈（2026-10-27 04:50 UECC-Windows-9EA759F0…，32 帧）：
+    //     FRunnableThreadWin → LowLevelTasks::FScheduler::WorkerLoop
+    //       → ParallelForImpl::ParallelForInternal
+    //         → AFGBuildableSubsystem::TickFactoryActors()::<lambda_1>   [:644]
+    //           → Remote_Factory.dll（本函数）→ UploadItemFromInventoryToCentralStorage [:97]
+    //             → TimerManager.cpp:524  Assertion failed: IsInGameThread()
+    //
+    //   ⇒ 上传动作**只能**留在 `Tick()`（AActor 的 PrimaryActorTick = 游戏线程，
+    //      本类构造函数已设 TickInterval=0.5s / bStartWithTickEnabled=true）。
+    //      这里硬性拦住 `Super::Factory_Tick(dt)` + 自带守卫，别再往并行路径上加任何
+    //      涉及「原版云端子系统 / 委托广播 / UI 状态」的调用。
+    Super::Factory_Tick(dt);
 }
 
-void AWTUpgradeStorage::DrainInventoryToLedger()
+void AWTUpgradeStorage::PumpBufferToCentralStorage()
 {
-    // ★0.2.36f 内部节流（见头文件 mLastLedgerDrainTime 的完整说明）。
-    //   本函数有**两条**触发路径：① 自己的 PrimaryActorTick（TickInterval = 0.5s）；
-    //   ② 基类链 AFGBuildableStorage : AFGBuildableFactory 带来的 Factory_Tick（TickInterval = 0.0
-    //   ⇒ 每帧）。节流放在**函数内部**而不是调用点：无论哪条路径先到、另一条会不会到，
-    //   整格库存的扫描频率恒为 0.5s；也避免"删掉某一条 drain 调用"导致上传静默失效的回归风险。
-    //   GetWorld() 为空（CDO 期）时不节流，沿用原有行为（此时库存组件也为空，等价于直接 return）。
+    // ★★★1.0.7 线程守卫（崩溃修复的**第二道保险**，第一道见 Factory_Tick 顶部的完整崩溃栈）：
+    //   本函数内部会调 `UploadItemFromInventoryToCentralStorage()`，原版实现会立刻广播
+    //   `mOnCentralStorageItemAmountUpdated` ⇒ 购物车 `UpdateShoppingList()` ⇒ `FTimerManager::FindTimer()`
+    //   ⇒ `check(IsInGameThread())`。只要不是在游戏线程调用，就必然是引擎断言崩溃（不是偶发）。
+    //   调用点现在只剩 `Tick()`（游戏线程）；这里再加一道守卫，防止将来有人把它塞回
+    //   Factory_Tick / 任何 ParallelFor 或异步任务里 —— 那种回归是「直接崩游戏」，代价太高。
+    if (!IsInGameThread())
+    {
+        WT_WARNF_ONCE(TEXT("depot-pump-offgamethread"), this,
+                TEXT("[upgrade] depot '%s' PumpBufferToCentralStorage() called OFF the game thread "
+                     "-- skipped (vanilla upload broadcasts a delegate that asserts IsInGameThread)."),
+                *GetName());
+        return;
+    }
+
+    // ★1.0.6 内部节流（见头文件 mLastBufferPumpTime 的完整说明）。
+    //   调用路径自 1.0.7 起**只剩 `Tick()`** 一条（`Factory_Tick` 是生产线程，已禁止调用）。
+    //   TickInterval = 0.5s，所以阈值取 0.4s 而不是 0.5s：引擎的 Tick 间隔是浮点累加，
+    //   经常出现「0.4999 < 0.5」⇒ 每隔一次 Tick 才跑一轮，上传速率白白减半。
+    //   保留节流而不是删掉，是为了将来万一有第二处（游戏线程）调用点时仍能去重。
     if (const UWorld* W = GetWorld())
     {
         const double Now = static_cast<double>(W->GetTimeSeconds());
-        if (mLastLedgerDrainTime >= 0.0 && (Now - mLastLedgerDrainTime) < 0.5)
+        if (mLastBufferPumpTime >= 0.0 && (Now - mLastBufferPumpTime) < 0.4)
         {
             return;
         }
-        mLastLedgerDrainTime = Now;
+        mLastBufferPumpTime = Now;
     }
 
-    // 遍历整格库存；格子会随研究阶段放到 10x10，规模化后这步有成本，值得单独计时。
-    WT_ZONE(TEXT("Upgrade.Storage.DrainLedger"));
+    WT_ZONE(TEXT("Upgrade.Storage.PumpToPool"));
+
+    UWorld* World = GetWorld();
     UFGInventoryComponent* Inv = GetStorageInventory();
-    if (!Inv)
+    if (!World || !Inv)
     {
         return;
     }
 
+    AFGCentralStorageSubsystem* Sub = AFGCentralStorageSubsystem::Get(World);
+    if (!Sub)
+    {
+        // 拿不到云端子系统 = 上传链根本不存在，货只会堆在本地缓冲（不会再"消失"，但也上不了云）。
+        // 一次性 Warn，避免每 0.5s 刷屏。
+        WT_WARNF_ONCE(TEXT("depot-no-cloudsub"), this,
+                TEXT("[upgrade] depot '%s' cannot reach AFGCentralStorageSubsystem — upload is a no-op."),
+                *GetName());
+        return;
+    }
+
+    // 遍历整格库存；格子会随研究阶段放到 10x10，规模化后这步有成本，值得单独计时。
     const int32 Size = Inv->GetSizeLinear();
-    int32 Moved = 0;
-    for (int32 i = 0; i < Size; ++i)
+    int32 Uploaded = 0;
+    int32 Calls = 0;
+
+    // ★1.0.8BI 按类累加本拍推进池子的量 —— 面板「正在上传 ↑X/分」要按物品行读，
+    //   只有总数是算不出每一类的（与下载站 mPullSamples 带 Item 的理由完全相同）。
+    TMap<UClass*, int32> MovedByClass;
+
+    for (int32 i = 0; i < Size && Calls < WT_MAX_UPLOADS_PER_PUMP; ++i)
     {
         FInventoryStack S;
         if (!Inv->GetStackFromIndex(i, S) || !S.HasItems())
         {
             continue;
         }
-        UClass* Cls = S.Item.GetItemClass().Get();
-        if (!Cls)
+
+        const TSubclassOf<UFGItemDescriptor> Cls = S.Item.GetItemClass();
+
+        // ★同一格要**连续提交**：原版这个入口一次只消化一件（见 WT_UploadStackToPool 实测注释），
+        //   若每格只提交一次，一格 500 个就得等 500 轮 ≈ 4 分钟，玩家会再次觉得「送不进去」。
+        //   循环到「原版拒收 / 配额满 / 这一格空了」为止，总次数仍受 WT_MAX_UPLOADS_PER_PUMP 约束。
+        while (Calls < WT_MAX_UPLOADS_PER_PUMP)
         {
-            continue;
+            // 原版的「能不能收」判据（物品过滤 + 该类配额是否已满）。不收就留在缓冲里，
+            // 绝不搬到别处 —— 这一条是「不丢料」的底线。
+            if (!Sub->CanUploadInventoryItemToCentralStorage(S.Item))
+            {
+                break;
+            }
+
+            const int32 Before = Sub->GetNumItemsFromCentralStorage(Cls);
+            ++Calls;
+            if (!Sub->UploadItemFromInventoryToCentralStorage(Inv, i))
+            {
+                break;   // 原版拒收：这一格保持原样
+            }
+
+            const int32 Moved = FMath::Max(0, Sub->GetNumItemsFromCentralStorage(Cls) - Before);
+            Uploaded += Moved;
+            if (Moved > 0)
+            {
+                MovedByClass.FindOrAdd(Cls.Get()) += Moved;
+            }
+
+            // 原版说收了、池子却没涨 ⇒ 别再空转（避免刷日志 / 白扫整格）。
+            if (Moved <= 0)
+            {
+                break;
+            }
+
+            // 这一格搬完了就换下一格。
+            if (!Inv->GetStackFromIndex(i, S) || !S.HasItems())
+            {
+                break;
+            }
         }
-        WT_LedgerAdd(mLedger, Cls, S.NumItems);
-        Moved += S.NumItems;
-        Inv->RemoveFromIndex(i, S.NumItems);   // 清空这一格
     }
 
-    if (Moved > 0)
+    if (Uploaded > 0)
     {
-        WT_LOGF(TEXT("[upgrade] depot '%s' took %d items into its own cloud ledger."), *GetName(), Moved);
+        // ★低频但关键（玩家最关心的就是「东西到底进云了没有」），用 Warn 保证 Shipping 下可见：
+        //   WT_LOGF 被 WT_LOG_VERBOSE=false 整段编译剔除，旧版正是因此看不到任何上传痕迹。
+        WT_WARNF(TEXT("[upgrade] depot '%s' pushed %d items into vanilla central storage (%d calls)."),
+                 *GetName(), Uploaded, Calls);
+
+        // ★1.0.8BI 每类各记一个样本（一拍一次，不是每件一次 —— 见 RecordUploadSample 注释）。
+        for (const TPair<UClass*, int32>& Pair : MovedByClass)
+        {
+            RecordUploadSample(Pair.Key, Pair.Value);
+        }
     }
+}
+
+void AWTUpgradeStorage::RecordUploadSample(UClass* Item, int32 Amount)
+{
+    if (!Item || Amount <= 0)
+    {
+        return;
+    }
+    const UWorld* World = GetWorld();
+    if (!World)
+    {
+        return;
+    }
+    const float Now = World->GetTimeSeconds();
+
+    // 淘汰窗口外的头部样本（数组按时间升序，过期的一定在最前面）。
+    int32 NumStale = 0;
+    while (NumStale < mUploadSamples.Num() && Now - mUploadSamples[NumStale].Time > WT_RATE_WINDOW)
+    {
+        ++NumStale;
+    }
+    if (NumStale > 0)
+    {
+        mUploadSamples.RemoveAt(0, NumStale);
+    }
+    mUploadSamples.Emplace(Now, Amount, Item);
+}
+
+float AWTUpgradeStorage::GetUploadRatePerMinute() const
+{
+    const UWorld* World = GetWorld();
+    if (!World || mUploadSamples.Num() < 2)
+    {
+        return 0.f;
+    }
+    return WT_SampleRatePerMinute(mUploadSamples, World->GetTimeSeconds(),
+                                  /*OnlyItem=*/nullptr, WT_RATE_WINDOW);
+}
+
+void AWTUpgradeStorage::GetItemRatesPerMinute(TMap<UClass*, float>& OutRates) const
+{
+    OutRates.Reset();
+    const UWorld* World = GetWorld();
+    if (!World)
+    {
+        return;
+    }
+    WT_CollectItemRates(mUploadSamples, World->GetTimeSeconds(), WT_RATE_WINDOW, OutRates);
 }
 
 int32 AWTUpgradeStorage::AddToLedger(TSubclassOf<UFGItemDescriptor> ItemClass, int32 Amount)
@@ -1685,17 +2916,20 @@ int32 AWTUpgradeStorage::GetLedgerAmount(TSubclassOf<UFGItemDescriptor> ItemClas
 void AWTUpgradeStorage::ApplyStorageGrid()
 {
     // Best-effort level read: in the CDO GetWorld() is null (falls back to level 1); for a placed
-    // instance the level reflects what the player has researched. NOTE: changing the grid after the
-    // inventory component was already created (BeginPlay) does not auto-resize the live inventory in
-    // vanilla -- newly placed buildings pick up the grid at construction, existing buildings keep
-    // their build-time grid until rebuilt. Tracked as a known follow-up.
+    // instance the level reflects what the player has researched.
+    // ★1.0.7：调用时机改成「BeginPlay 里、Super::BeginPlay() 之前」（见 BeginPlay 的说明）——
+    //   原版是在 Super::BeginPlay 里按这两个字段建库存的，晚一步就只是改了个没人读的字段。
+    //   已存在的旧建筑仍按存档里那份库存走，改网格需要拆了重建（原版同样如此）。
     // ★2026-10-07 定案（见设计表 §6.1）：本地缓冲格网**不再是主维度**（主维度是云端配额）。
-    //   这里改成「按阶段跳」：阶段 1~5 -> 2x2 / 4x4 / 6x6 / 8x8 / 10x10（4 → 100 格）。
-    //   原版上传器的本地缓冲本来就只有 1 组（wiki："internal buffer of one stack"），
-    //   而云端是按配额收件 —— 缓冲放得越大反而把物品堵在本地，所以这一维只做温和放大。
+    // ★★★1.0.7 改口径（用户 2026-10-27 截图对比后定案「改成 1×1 起步（贴原版）」）：
+    //   原版上传器（AFGCentralStorageContainer）的本地缓冲就是 **1 格**，面板据此把那一格
+    //   画成大图标 + 数量角标。我们原来从 2x2 起步 ⇒ 同一个原版面板会画成 2x2 的小格子网格，
+    //   物品挤在左上角、数量角标被缩没、还多出 3 个空格子 —— 截图里「我们的比原版多格子」就是它。
+    //   现在：阶段 1~5 -> 1x1 / 2x2 / 3x3 / 4x4 / 5x5（1 → 25 格）。
+    //   缓冲放得越大反而把物品堵在本地（云端才是主仓），所以这一维只做温和放大，起点与原版一致。
     const int32 L = (GetWorld() ? WT_GetTrackLevel(GetWorld(), EWTUpgradeTrack::Storage) : 1);
     const int32 Stage = WT_StageForLevel(L);
-    const int32 Side = FMath::Clamp(2 * Stage, 2, 10);
+    const int32 Side = FMath::Clamp(Stage, 1, 10);
     mInventorySizeX = Side;
     mInventorySizeY = Side;
     WT_LOGF(TEXT("[upgrade] storage grid Lv%d (stage %d) -> %dx%d = %d slots"),
@@ -1726,7 +2960,7 @@ void AWTUpgradeStorage::GetDismantleRefund_Implementation(TArray<FInventoryStack
         {
             continue;
         }
-        // 账本只收固体（DrainInventoryToLedger 只搬 UFGInventoryComponent 里的货，
+        // 账本历来只收固体（旧版 `DrainInventoryToLedger` 只搬 UFGInventoryComponent 里的货，
         // 与 GetDismantleInventoryReturns 的 RF_SOLID 口径一致），所以这里不做形态过滤。
         UFGInventoryLibrary::MergeInventoryItem(out_refund, FInventoryStack(IA.Amount, IA.ItemClass));
         Refunded += IA.Amount;
@@ -1750,6 +2984,10 @@ void AWTUpgradeStorage::GetDismantleRefund_Implementation(TArray<FInventoryStack
 
 AWTUpgradeCloudDownloader::AWTUpgradeCloudDownloader()
 {
+    // ★★★1.0.7 面板标题修复（同 AWTUpgradeStorage ctor 的详细说明）：纯 C++ 建筑必须自己写
+    //   AFGBuildable::mDisplayName，否则复用原版面板时标题栏是空的。
+    mDisplayName = GetDisplayName();
+
     // 拉货是主动行为，需要自己的 Tick（仓库基类默认不 tick）。
     // ★★0.2.36c 加载期修复：bStartWithTickEnabled 也必须打开（基类 AFGBuildableStorage 设为 false，
     //   不打开则 Tick() 永不跑 ⇒ 下载站完全不下货）。理由详见 AWTUpgradeStorage ctor。
@@ -1799,15 +3037,15 @@ AWTUpgradeCloudDownloader::AWTUpgradeCloudDownloader()
             GetStorageInventory() ? TEXT("yes") : TEXT("NO"));
 
     // ★0.2.36b 材质：模型是位面存储站的，材质也抄它的（不能抄 Mk2 集装箱的涂装）。
-    // ★0.2.36b 用户定案：**云端站用云端面板**（位面存储站上传器），不用工业集装箱面板 ——
-    //   面板与材质都出自同一台原版建筑，打开看到的就是原版云端界面。
+    // ★1.0.7 面板改为**自建输出选型面板**（用户定案「云端下载站的 UI 重构，采用新面板，
+    //   全物品中选择需要输出的物品」）—— 不再复用原版云端面板：原版面板只能看池子，
+    //   没法指定「我要它吐哪种货」，而下载站的核心诉求恰恰是这个。
     if (UClass* VanillaDepot = WT_FindVanillaClass(
             TEXT("/Game/FactoryGame/Buildable/Factory/CentralStorage/Build_CentralStorage.Build_CentralStorage_C"),
             TEXT("Build_CentralStorage_C"), AFGBuildable::StaticClass()))
     {
         VanillaDepot->AddToRoot();
         WT_CopyVanillaMeshMaterials(VanillaDepot, MeshComp);
-        WT_ReuseVanillaInteractWidget(this, VanillaDepot);
 
         // ★0.2.48 输出口摆到原版那个口（(0,390,100)/Yaw90）。下载站=纯下载，只留这一个输出口
         // （不再叠输入口，避免「一个口同时显输入+输出」与连接全息吸错口）。
@@ -1822,94 +3060,379 @@ AWTUpgradeCloudDownloader::AWTUpgradeCloudDownloader()
                 *WT_VANILLA_PORT_LOC.ToString(), *WT_VANILLA_PORT_ROT.ToString());
     }
 
+    // ★1.0.7 面板：放在 vanilla-depot 分支**之外** —— 材质/端口依赖原版蓝图类，但面板不依赖，
+    //   原版蓝图类万一改路径也不会把面板一起带下水。
+    WT_UseNativeInteractPanel(this, UWTItemSelectPanelWidget::StaticClass());
+
     ApplyStorageGrid();
 
     WT_LOGF(TEXT("[upgrade] downloader mesh='%s' footprint=500x900 uu height=423 uu"),
             Spec.Mesh ? *Spec.Mesh->GetName() : TEXT("<cube fallback>"));
 }
 
+void AWTUpgradeCloudDownloader::ApplyResearchedCapacity()
+{
+    // 与上传站同一套：改 mInventorySizeX/Y 不会自动重建库存，必须 Resize 现有库存（只扩不缩，保留货物）。
+    ApplyStorageGrid();
+    if (UFGInventoryComponent* Inv = GetStorageInventory())
+    {
+        UFGInventoryComponent* Target = Inv;
+        FString How;
+        if (UFGInventoryComponent* Active = WT_ResolveActiveStorageInventory(this, How))
+        {
+            Target = Active;
+        }
+        const int32 Need = mInventorySizeX * mInventorySizeY;
+        if (Target->GetSizeLinear() < Need)
+        {
+            Target->Resize(Need);
+            WT_WARNF(TEXT("[upgrade] downloader '%s' capacity grown to %dx%d=%d slots (was %d)."),
+                     *GetName(), mInventorySizeX, mInventorySizeY, Need, Target->GetSizeLinear());
+        }
+    }
+}
+
 void AWTUpgradeCloudDownloader::BeginPlay()
 {
-    Super::BeginPlay();
+    // ★1.0.7 顺序修复（与上传站同款）：库存尺寸必须在 Super::BeginPlay() 之前定好，
+    //   原版是在基类 BeginPlay 里按 mInventorySizeX/Y 建库存的 —— 详见 AWTUpgradeStorage::BeginPlay。
     ApplyStorageGrid();
+    Super::BeginPlay();
     WT_LogConnectionPorts(this, TEXT("ports-downloader"));   // ★0.2.42 接口可见性取证
-    WT_LOGF(TEXT("[upgrade] downloader '%s' grid %dx%d (%d slots) ready."),
-            *GetName(), mInventorySizeX, mInventorySizeY, mInventorySizeX * mInventorySizeY);
+
+    // ★1.0.8BK 中间动态雾面片：本类 = 固体下载站（货从云端吐出去）⇒ 流动方向反向（flow=out）。
+    mGlowPlane = WT_EnsureGlowFogPlane(this, WT_VANILLA_PORT_LOC, FVector(0.f, 1.f, 0.f),
+                                       /*TargetSize=*/250.f, /*Inset=*/8.f, /*bFlowOutward=*/true);
+
+    // ★1.0.8（2026-10-31 用户修正）：箭头是**液体站专属**，固体站不加箭头。
+    //   （WT_AddPortDirectionArrow 保留定义，供日后液体上传/下载站复用；此处不调用。）
+
+    // ★★★1.0.7l 既有建筑扩容 + 取「真正生效」的库存组件：
+    //   ApplyStorageGrid() 只对**新建**建筑有效 —— 原版是在 AFGBuildableStorage::BeginPlay 里
+    //   按 mInventorySizeX/Y 建库的。已经放在存档里的下载站就是 1 格（1.0.7 的回归），
+    //   而 1 格意味着「格子里只要有任意物品，另一种货就永远 AddStack 失败」⇒ 永久死锁。
+    //   另外官方注释明确要求不要直接用 mStorageInventory（见 WT_ResolveActiveStorageInventory
+    //   的完整依据），所以这里也换成活跃库。
+    //     · GetSizeLinear() 是 inline 读 mInventoryStacks，是唯一可信的格数来源；
+    //     · Resize() 在 SML Private/FGInventoryComponent.cpp:54 是空桩，但**运行时链接的是
+    //       游戏本体的真实实现**（桩只用于让 mod 编译通过）；
+    //     · 只在「想要 > 实际」时调，天然幂等，对新建建筑是 no-op。
+    FString InvHow;
+    UFGInventoryComponent* StoreInv = WT_ResolveActiveStorageInventory(this, InvHow);
+    const int32 WantedSlots = FMath::Max(4, mInventorySizeX * mInventorySizeY);
+    const int32 CurrentSlots = StoreInv ? StoreInv->GetSizeLinear() : -1;
+    if (StoreInv && WantedSlots > CurrentSlots)
+    {
+        StoreInv->Resize(WantedSlots);
+    }
+    // ★这条日志是「库存到底怎么解析的」的唯一证据：inv= 后面能直接看出是反射命中
+    //   （`...Handler::GetActiveInventoryComponent`）还是兜底（`storage-inventory(fallback)`）。
+    WT_WARNF(TEXT("[upgrade] downloader '%s' inventory resolved via '%s': %d -> %d slots"),
+             *GetName(), *InvHow, CurrentSlots, StoreInv ? StoreInv->GetSizeLinear() : -1);
+
+    // ★1.0.6 与上传站同款修复：ctor 期 SetInventory 未必可靠（见 AWTUpgradeStorage::BeginPlay），
+    //   输出口在 BeginPlay 再绑一次——幂等，绑好了重复设置无副作用。
+    if (mConveyorOut)
+    {
+        // ★1.0.7l 绑的是同一个活跃库（此前绑的是 mStorageInventory，可能是非活跃的底层库）。
+        mConveyorOut->SetInventory(StoreInv);
+        mConveyorOut->SetDirection(EFactoryConnectionDirection::FCD_OUTPUT);
+        WT_WARNF(TEXT("[upgrade] downloader '%s' conveyor output rebind: dir=%d bound=%s (activeInv=%s)"),
+                 *GetName(),
+                 static_cast<int32>(mConveyorOut->GetDirection()),
+                 mConveyorOut->GetInventory() ? TEXT("yes") : TEXT("NO"),
+                 StoreInv ? TEXT("yes") : TEXT("NO"));
+    }
+}
+
+void AWTUpgradeCloudDownloader::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    // ★2026-11-02（用户截图反馈：拆除固体下载站后残留一块带外星纹理方块）：
+    // 与上传站同款修复——EndPlay + BeginDestroy 双重兜底销毁 BeginPlay 运行时加的发光面片组件。
+    WT_DestroyGlowComponents(this, mGlowPlane, TEXT("downloader EndPlay"));
+    Super::EndPlay(EndPlayReason);
+}
+
+void AWTUpgradeCloudDownloader::BeginDestroy()
+{
+    // ★2026-11-02：EndPlay 兜底——若拆解路径未触发 EndPlay，BeginDestroy 必然触发，确保光膜组件被销毁。
+    WT_DestroyGlowComponents(this, mGlowPlane, TEXT("downloader BeginDestroy"));
+    Super::BeginDestroy();
+}
+
+void AWTUpgradeCloudDownloader::Dismantle_Implementation()
+{
+    // ★2026-11-02：与上传站同款——拆除特效会把运行时发光面片套上拆除材质露出原始外星纹理方块；
+    //   拆除真正开始时先销毁光膜，让随后的拆除特效不再包含它。
+    WT_DestroyGlowComponents(this, mGlowPlane, TEXT("downloader Dismantle"));
+    Super::Dismantle_Implementation();
 }
 
 void AWTUpgradeCloudDownloader::ApplyStorageGrid()
 {
     // 与上传站同一套阶段放大（见 AWTUpgradeStorage::ApplyStorageGrid 的定案注释）。
+    //
+    // ★★★1.0.7l 致命 bug 修复：「下载站选好物品也不出货」的真正根因是**缓冲只有 1 格**。
+    //   1.0.7 时按上传站的「贴原版 1 格」定案一起改成了 `Clamp(Stage, 1, 10)` ⇒ 1x1。
+    //   但那条定案只对**上传站**成立（它复用原版 AFGCentralStorageContainer 面板，原版面板按
+    //   1 格画大图标 + 数量角标）。下载站用的是本 mod 自建面板（UWTItemSelectPanelWidget），
+    //   根本没有「贴原版格子」这个约束 —— 套用过来只有害处：
+    //     1 格缓冲下，只要那格里已经有任何物品（上一次搬进来的货、玩家手动放的、或者传送带
+    //     出口堵着没抽走），`Inv->AddStack()` 对另一种物品就**必然返回 0** ⇒ TryPullFromCloud
+    //     每次都「取到货 → 放不下 → 退回账本」⇒ 面板显示云端有货、机器却永远不出货。
+    //   而且这个失败**完全不可见**：诊断用的 `GetInventoryStacks()` / `GetNumItems()` 在 SML
+    //   里都是空桩（Private/FGInventoryComponent.cpp:79 `{ }` 与 :74 `return int32()`），
+    //   打出来的 `buffer=0/1(has 0)` 是假象，把「格子其实已占满」伪装成「缓冲是空的」。
+    //   ⇒ 下载站缓冲最小 2x2（4 格）：任何单格占用都不再能造成永久死锁。
     const int32 L = (GetWorld() ? WT_GetTrackLevel(GetWorld(), EWTUpgradeTrack::Storage) : 1);
     const int32 Stage = WT_StageForLevel(L);
-    const int32 Side = FMath::Clamp(2 * Stage, 2, 10);
+    const int32 Side = FMath::Clamp(Stage, 2, 10);
     mInventorySizeX = Side;
     mInventorySizeY = Side;
-    WT_LOGF(TEXT("[upgrade] downloader grid Lv%d (stage %d) -> %dx%d = %d slots"),
-            L, Stage, Side, Side, Side * Side);
+    WT_WARNF(TEXT("[upgrade] downloader grid Lv%d (stage %d) -> %dx%d = %d slots"),
+             L, Stage, Side, Side, Side * Side);
 }
 
 void AWTUpgradeCloudDownloader::Tick(float dt)
 {
-    WT_ZONE(TEXT("Upgrade.Downloader.Tick"));   // 2s 一次
+    WT_ZONE(TEXT("Upgrade.Downloader.Tick"));   // 每帧（TickInterval 未设 = 0），但额度不够时立刻 return
     Super::Tick(dt);
 
-    mPullCooldown -= dt;
-    if (mPullCooldown > 0.f)
+    // ★★★1.0.7o 用户定案（2026-10-27）：「把原版的上传速度搬过来，改成下载速度」。
+    //
+    //   旧节拍：`mPullInterval = 2s` 固定，每 2 秒搬**一组**（最多 100 件）
+    //          ⇒ 稳态实测约 1200 件/分，而原版云端上传是 1 件/秒（60 件/分）——
+    //            下载比上传快 20 倍，云端只进不出/只出不进两种极端都不对称。
+    //   新节拍：按原版上传口径累积**额度**，每 T 秒才允许搬 1 件
+    //          （T = AFGCentralStorageSubsystem::GetCentralStorageTimeToUpload()，含解锁倍率）。
+    //
+    //   额度制而不是「固定间隔搬 1 件」的理由：TickInterval 是 0.5 秒，而 T 可能小于 0.5 秒
+    //   （解锁加速后），也可能远大于 0.5 秒。用额度累积能把任意 T 精确折算成「这一拍该搬几件」，
+    //   不必改 Tick 频率，也不会出现「T=0.1 秒却只能搬 1 件/0.5 秒」的硬上限。
+    const float SecondsPerItem = FMath::Max(0.01f, GetVanillaUploadSecondsPerItem());
+    // 本拍应得的额度（件）。T=1s、TickInterval=0.5s ⇒ 0.5 件/拍 ⇒ 两拍搬 1 件 = 1 件/秒。
+    const float PerTick = dt / SecondsPerItem;
+    mPullCredit += PerTick;
+    // 额度上限 = 两拍的份额（且不少于 1 件）。
+    //   ★这是「不囤积」的关键：缓冲长时间堵塞时额度不会攒到几十件，解堵后也就不会一次性爆量
+    //   ——否则玩家会看到「堵了 5 分钟，突然甩出 300 件」，既不像原版速度也会瞬时卡顿。
+    //   同时它也保证了「一拍没搬成（Moved=0）⇒ 下一拍最多补 1~2 拍的量」，长期平均仍等于限速。
+    const float CreditCap = FMath::Max(1.f, PerTick * 2.f);
+    mPullCredit = FMath::Min(mPullCredit, CreditCap);
+    if (mPullCredit < 1.f)
     {
         return;
     }
-    mPullCooldown = mPullInterval;
-    TryPullFromCloud();
+
+    const int32 Budget = FMath::FloorToInt(mPullCredit);
+    const int32 Moved = TryPullFromCloud(Budget);
+    if (Moved > 0)
+    {
+        // 只按**真的搬到的件数**扣额度：搬不满（缓冲空间不够）时额度自然被上面的 cap 压住，
+        // 不会无限堆积，也不会因为「搬不满」而永久欠速。
+        mPullCredit -= static_cast<float>(Moved);
+    }
+
+    // ★限速口径自证：只在口径变化（或每 60 秒）打一条，方便玩家/我核对「下载是不是真的按原版速度」。
+    const UWorld* RateWorld = GetWorld();
+    if (RateWorld)
+    {
+        const float NowRate = RateWorld->GetTimeSeconds();
+        if (NowRate - mLastRateLimitLogTime >= 60.f)
+        {
+            mLastRateLimitLogTime = NowRate;
+            WT_WARNF(TEXT("[downloader] '%s' rate limit: %.2fs/item (= %.0f items/min, from vanilla ")
+                          TEXT("central-storage upload speed) credit=%.1f"),
+                     *GetName(), SecondsPerItem, 60.f / SecondsPerItem, mPullCredit);
+        }
+    }
 }
 
-void AWTUpgradeCloudDownloader::TryPullFromCloud()
+float AWTUpgradeCloudDownloader::GetVanillaUploadSecondsPerItem() const
 {
+    // ① 权威口径：子系统返回的**已经乘过解锁倍率**的秒数
+    //    （UFGCentralStorageSettings 的 tooltip 明确写着 mDefaultTimeToUpload 会被
+    //      AFGUnlockSubsystem::mUnlockedCentralStorageUploadSpeedMultiplier 影响）。
+    //    SML 桩里它是 `return float()`（0），但运行时链接游戏本体真实现 —— 与
+    //    GetSizeLinear()/AddStack() 同一类「桩是空的、运行时是真的」情况（本项目已踩过）。
+    if (const UWorld* World = GetWorld())
+    {
+        if (AFGCentralStorageSubsystem* Sub = AFGCentralStorageSubsystem::Get(const_cast<UWorld*>(World)))
+        {
+            const float T = Sub->GetCentralStorageTimeToUpload();
+            if (T > 0.f)
+            {
+                return T;
+            }
+        }
+    }
+
+    // ② 退化：读设置里的基础值（没有解锁倍率，但至少是个合理数）
+    if (const UFGCentralStorageSettings* Settings = UFGCentralStorageSettings::Get())
+    {
+        if (Settings->mDefaultTimeToUpload > 0.f)
+        {
+            return Settings->mDefaultTimeToUpload;
+        }
+    }
+
+    // ③ 最后兜底：1 件/秒（原版容器的 mTimeToUpload 默认值就是 1.f）。
+    //    ★绝不返回 0 —— Tick 里会除它，0 会让额度瞬间爆到 64 件上限。
+    return 1.f;
+}
+
+float AWTUpgradeCloudDownloader::GetDownloadRateLimitPerMinute() const
+{
+    return 60.f / FMath::Max(0.01f, GetVanillaUploadSecondsPerItem());
+}
+
+int32 AWTUpgradeCloudDownloader::TryPullFromCloud(int32 MaxItems)
+{
+    // ★1.0.7o `MaxItems` = 本拍由「原版上传速度」累积出的取货额度（≥1）。
+    //   以前这里是「一周期一组」，现在必须**按额度**取，否则限速形同虚设。
+    if (MaxItems <= 0)
+    {
+        return 0;
+    }
     // 每次拉货都要 TActorIterator 遍历全部上传站（O(站数)），站多了这步会变贵。
     WT_ZONE_COARSE(TEXT("Upgrade.Downloader.TryPull"));
     UWorld* World = GetWorld();
     if (!World)
     {
-        return;
+        return 0;
     }
 
     UFGInventoryComponent* Inv = GetStorageInventory();
     if (!Inv)
     {
-        return;
+        return 0;
+    }
+
+    // ★★★1.0.7l 换成**真正生效**的库存组件（官方注释：别直接用 mStorageInventory）。
+    FString InvHow;
+    UFGInventoryComponent* ActiveInv = WT_ResolveActiveStorageInventory(this, InvHow);
+    if (ActiveInv)
+    {
+        Inv = ActiveInv;
+    }
+    // ★自愈：格数不足当场扩容。BeginPlay 里那次 Resize 可能因存档加载顺序或反射失配没跑到，
+    //   这里每周期兜一次 —— GetSizeLinear() 是 inline 真值，已经够大时 Resize 不会被调用。
+    if (Inv->GetSizeLinear() < 4)
+    {
+        Inv->Resize(4);
+        WT_WARNF(TEXT("[downloader] '%s' self-heal: buffer resized to %d slots (inv=%s)"),
+                 *GetName(), Inv->GetSizeLinear(), *InvHow);
     }
 
     // ---- 第一优先：原版云端池（用户定案「先看原版云端是否修建+内容」）----
+    //
+    // ★★★1.0.7m 修复「面板显示云端剩 1,400 铁矿石，下载站一件都不搬」（2026-10-27 实测）。
+    //
+    //   旧代码把 `IsCentralStorageBuilt()` 当**硬门槛**。可它的实现是
+    //   `return mCentralStorages.Num() > 0;`（SDK `Public/FGCentralStorageSubsystem.h:57`，
+    //   头文件 inline）—— 读的是**上传器注册表**，不是货架。实测存档里原版池中确有
+    //   1,400 铁矿石（面板「云端剩余」读 GetAllItemsFromCentralStorage 得到），而这张
+    //   注册表是空的（cloudBuilt=0）⇒ 有货的池被整段跳过，诊断随即打出
+    //   `ledger=0 taken=0`，看上去像「云端没货」，其实货一直躺在原版池里没人去取。
+    //   ⇒ 判据改成**按池内容判定**：池里有这一类的存货就试搬一次。这与面板
+    //     「云端剩余」完全同源（两边都只读 GetAllItemsFromCentralStorage），
+    //     不会再出现「面板说 1,400、下载站认为 0」的口径分裂。
+    //
+    // 两层搬运，前一层成功就完全不会进下一层：
+    //   ① MoveItemFromCentralStorage —— 原版标准路径（池扣数 + 自动选槽 + 广播通知）；
+    //   ② GrabItemFromCentralStorage —— 指定目标格，绕开自动选槽（缓冲里有半格时更灵）。
+    //   ★刻意**没有**「先扣后放」的第三层，理由见下面 ② 失败处那段注释（会真丢货）。
+    int32 DiagCloudEntries    = 0;
+    int32 DiagCloudContainers = -1;
+    int32 DiagCloudTried      = 0;
+    int32 DiagCloudGot        = 0;
     if (AFGCentralStorageSubsystem* Sub = AFGCentralStorageSubsystem::Get(World))
     {
-        if (Sub->IsCentralStorageBuilt())
+        // 纯诊断：注册表大小（原版「是否已修建」就看这个数）。它**不参与**搬运判定。
+        DiagCloudContainers = Sub->GetCentralStorageContainers().Num();
+
+        TArray<FItemAmount> CloudItems;
+        Sub->GetAllItemsFromCentralStorage(CloudItems);
+        DiagCloudEntries = CloudItems.Num();
+        // 每个周期只搬一种、最多一组 —— 温和搬运，不抢锁不清仓。
+        for (const FItemAmount& IA : CloudItems)
         {
-            TArray<FItemAmount> CloudItems;
-            Sub->GetAllItemsFromCentralStorage(CloudItems);
-            // 每个周期只搬一种、最多一组 —— 温和搬运，不抢锁不清仓。
-            for (const FItemAmount& IA : CloudItems)
+            if (IA.Amount <= 0 || IA.ItemClass.Get() == nullptr)
             {
-                if (IA.Amount <= 0 || IA.ItemClass.Get() == nullptr)
+                continue;
+            }
+            // ★1.0.7x 面板白名单：**必须显式选过**才搬（空名单 = 一件都不搬）。
+            if (!IsOutputAllowed(IA.ItemClass))
+            {
+                continue;
+            }
+            const int32 StackSize = UFGItemDescriptor::GetStackSize(IA.ItemClass);
+            FItemAmount Want;
+            Want.ItemClass = IA.ItemClass;
+            // ★1.0.7o 三重上限：池里的量 / 一组（StackSize）/ **本拍额度**（原版上传速度算出）。
+            //   额度是最后加的，也是真正让「下载速度 = 上传速度」生效的那一层。
+            Want.Amount = FMath::Min(IA.Amount, FMath::Min(FMath::Max(1, StackSize), MaxItems));
+            ++DiagCloudTried;
+
+            // ① 原版标准路径
+            int32 Moved = UFGInventoryLibrary::MoveItemFromCentralStorage(Want, Inv);
+
+            // ② 指定格（原版自动选槽失败时，往具体格子放往往能成）
+            if (Moved <= 0)
+            {
+                const int32 Slots = Inv->GetSizeLinear();
+                for (int32 Slot = 0; Slot < Slots && Moved <= 0; ++Slot)
                 {
-                    continue;
+                    Moved = UFGInventoryLibrary::GrabItemFromCentralStorage(Want, Inv, Slot);
                 }
-                const int32 StackSize = UFGItemDescriptor::GetStackSize(IA.ItemClass);
-                FItemAmount Want;
-                Want.ItemClass = IA.ItemClass;
-                Want.Amount = FMath::Min(IA.Amount, FMath::Max(1, StackSize));
-                const int32 Moved = UFGInventoryLibrary::MoveItemFromCentralStorage(Want, Inv);
-                if (Moved > 0)
+            }
+
+            // ★★★1.0.7m 深度自检抓到的坑：**这里不能有「先扣后放」的第三层**。
+            //   原本写了 `TryRemoveItemsFromCentralStorage` + `AddStack` 兜底：先把它从池里
+            //   扣出来，再往缓冲里塞，塞不下就把剩余报 Error。问题在于 —— 能走到这一步就
+            //   说明 ① ② 都搬不进去，而 ②（GrabItemFromCentralStorage）本身就是「往指定格搬、
+            //   放得下多少搬多少」，它返回 0 已经等于「缓冲此刻放不下这类货」。
+            //   此时再先扣后放，扣出来的东西必然也塞不进去 ⇒ **每次死循环都真丢一组货**，
+            //   比"搬不动"严重得多（1.0.6「塞进去的东西凭空消失」的下一个版本）。
+            //   ⇒ 兜底层已删除。①② 都失败时保持池不动，由下面的 idle 诊断把真相打出来：
+            //     `pool[entries>0 tried>0 got=0]` = 池里有货但缓冲放不下，去清缓冲/接传送带。
+
+            DiagCloudGot = FMath::Max(DiagCloudGot, Moved);
+            if (Moved > 0)
+            {
+                // ★1.0.7n 喂下载速度（只算真正进缓冲的件数）；1.0.7p 起带上物品类，
+                //   面板行内「下载速度」列要按类取读数。
+                RecordDownloadSample(Moved, IA.ItemClass.Get());
+                // ★成功也要打：旧版是 WT_LOGF，被 WT_LOG_VERBOSE=false 整句编译剔除，
+                //   于是「搬了」和「没搬」在 Shipping 日志里长得一样。限流 10 秒。
+                const float NowLog = World->GetTimeSeconds();
+                if (NowLog - mLastPullLogTime >= 10.f)
                 {
-                    WT_LOGF(TEXT("[downloader] '%s' pulled %d x %s from the vanilla cloud."),
-                            *GetName(), Moved, *IA.ItemClass->GetName());
-                    return;   // 一周期一种
+                    mLastPullLogTime = NowLog;
+                    WT_WARNF(TEXT("[downloader] '%s' pulled %d x %s from the vanilla cloud pool ")
+                                  TEXT("(entries=%d containers=%d)."),
+                             *GetName(), Moved, *Want.ItemClass->GetName(),
+                             DiagCloudEntries, DiagCloudContainers);
                 }
+                return Moved;   // 本拍只搬一笔，额度由 Tick 按实际件数扣减
             }
         }
     }
 
     // ---- 第二优先：我们自己的云（各上传站的账本）----
     // 走到这里 = 原版云端没修建或这类货为 0 —— 正好是用户定的「才使用我们的云端」。
+    //
+    // ★★★1.0.7l 诊断累加器：只采集**真实函数的返回值**。
+    //   旧诊断用的 `GetInventoryStacks()`（SML 桩 `{ }`）与 `GetNumItems()`（桩 `return 0`）
+    //   恒为空/0 ⇒ 打出的 `buffer=0/1(has 0)` 是假象，把「缓冲其实已占满」显示成「缓冲空着」，
+    //   直接导致上一轮误判成「云端没货」。现在看 TakeFromLedger / AddStack 的真实返回，
+    //   一眼能分出「账本没货(taken=0)」与「缓冲放不下(added=0 且 taken>0)」。
+    int32 DiagStations      = 0;
+    int32 DiagLedgerEntries = 0;
+    int32 DiagMatched       = 0;
+    int32 DiagTaken         = 0;
+    int32 DiagAdded         = 0;
+
     for (TActorIterator<AWTUpgradeStorage> It(World); It; ++It)
     {
         AWTUpgradeStorage* Station = *It;
@@ -1917,34 +3440,301 @@ void AWTUpgradeCloudDownloader::TryPullFromCloud()
         {
             continue;
         }
+        ++DiagStations;
         for (const FItemAmount& IA : Station->GetLedger())
         {
+            ++DiagLedgerEntries;
             UClass* Cls = IA.ItemClass.Get();
             if (IA.Amount <= 0 || !Cls)
             {
                 continue;
             }
+            // ★1.0.7 面板白名单（同原版池分支）。
+            if (!IsOutputAllowed(IA.ItemClass))
+            {
+                continue;
+            }
+            ++DiagMatched;
             const int32 StackSize = UFGItemDescriptor::GetStackSize(IA.ItemClass);
-            const int32 Want = FMath::Min(IA.Amount, FMath::Max(1, StackSize));
+            // ★1.0.7o 同原版池分支：额度也算进上限（下载速度 = 原版上传速度）。
+            const int32 Want = FMath::Min(IA.Amount, FMath::Min(FMath::Max(1, StackSize), MaxItems));
             const int32 Taken = Station->TakeFromLedger(IA.ItemClass, Want);
+            DiagTaken = FMath::Max(DiagTaken, Taken);
             if (Taken <= 0)
             {
                 continue;
             }
             FInventoryStack S(Taken, IA.ItemClass);
-            const int32 Added = Inv->AddStack(S, true);
+            int32 Added = Inv->AddStack(S, true);
+
+            // ★1.0.7l 二级投放：`AddStack()` 走的是组件自己的「自动选槽」逻辑，在
+            //   「活跃库与底层库不是同一个组件」或组件内部状态异常时会**整体返回 0**，
+            //   而这时逐格调用 `AddStackToIndex()` 往往还能成功（它绕开自动选槽）。
+            //   两段式是纯增量优化：第一段成功就完全不会进这个分支。
+            if (Added <= 0 && Taken > 0)
+            {
+                const int32 Slots = Inv->GetSizeLinear();
+                for (int32 Slot = 0; Slot < Slots && Added < Taken; ++Slot)
+                {
+                    const int32 Put = Inv->AddStackToIndex(
+                        Slot, FInventoryStack(Taken - Added, IA.ItemClass), /*allowPartialAdd=*/true,
+                        /*sourceInventory=*/nullptr);
+                    if (Put > 0)
+                    {
+                        Added += Put;
+                    }
+                }
+            }
+
+            DiagAdded = FMath::Max(DiagAdded, Added);
             if (Added < Taken)
             {
                 Station->AddToLedger(IA.ItemClass, Taken - Added);   // 没放下的退回账本
             }
             if (Added > 0)
             {
+                // ★1.0.7n 同原版池分支：只把真正进缓冲的量计入下载速度
+                //   （`Added` 已扣掉「没放下又退回账本」的那部分）。
+                RecordDownloadSample(Added, Cls);
                 WT_LOGF(TEXT("[downloader] '%s' pulled %d x %s from our own cloud ledger."),
                         *GetName(), Added, *Cls->GetName());
-                return;   // 一周期一种
+                return Added;   // 本拍只搬一笔，额度由 Tick 按实际件数扣减
             }
         }
     }
+
+    // ---- ★1.0.7l 诊断快照：走到这里 = 两路都没搬成 ----
+    // 「面板选了但不下载」这只报障无法自证，因为真正的搬运成功日志是 WT_LOGF（被
+    // WT_LOG_VERBOSE=false 编译剔除，Shipping 里不存在）。这里补一条**限流**的现状快照，
+    // 只在白名单非空（= 玩家明确指定了物品）且连续 10 秒没搬动时打一次，开销可忽略。
+    //   slots    —— 缓冲总格数。★只有 GetSizeLinear() 可信（:443 inline 读 mInventoryStacks）；
+    //               GetInventoryStacks()/GetNumItems() 在 SML 里是空桩，读数全是假的，已弃用。
+    // ✓ ★1.0.7m 口径修正：旧行的 `cloudBuilt=0` 被误读成「玩家没修云端」或「云端没货」，
+    //   其实它只是注册表 mCentralStorages.Num()。现在拆成三段：
+    //   pool[...] —— 原版云池：entries=池内条目数（== 面板「云端剩余」的来源）、
+    //               containers=上传器注册表大小（built 的原义）、tried=本轮试搬次数、
+    //               got=本轮实际搬出量（0 而 entries>0 ⇒ 三层搬运全失败，去查池/缓冲）、
+    //               built=IsCentralStorageBuilt() 原值（保留以便对照，**不是**搬运判据）。
+    //   ours[...] —— 我们自己的云：见下方 stations/ledger/matched/taken/added 说明。
+    if (mOutputFilter.Num() > 0)
+    {
+        const float Now = World->GetTimeSeconds();
+        if (Now - mLastIdleDiagTime >= 10.f)
+        {
+            mLastIdleDiagTime = Now;
+            // ★不能写 const UClass*：TSubclassOf<UFGItemDescriptor> 的构造函数只吃非 const UClass*
+            //   （实测 C2440「无法从 const UClass* 转换」）。诊断用不影响语义。
+            UClass* First = mOutputFilter[0].Get();
+            AFGCentralStorageSubsystem* DiagSub = AFGCentralStorageSubsystem::Get(World);
+            WT_WARNF(TEXT("[downloader] '%s' idle: filter=%d first=%s budget=%d | slots=%d inv=%s | ")
+                          TEXT("pool[entries=%d containers=%d tried=%d got=%d built=%d] | ")
+                          TEXT("ours[stations=%d ledger=%d matched=%d taken=%d added=%d]"),
+                     *GetName(), mOutputFilter.Num(),
+                     First ? *First->GetName() : TEXT("<null>"), MaxItems,
+                     Inv->GetSizeLinear(), *InvHow,
+                     DiagCloudEntries, DiagCloudContainers, DiagCloudTried, DiagCloudGot,
+                     (DiagSub && DiagSub->IsCentralStorageBuilt()) ? 1 : 0,
+                     DiagStations, DiagLedgerEntries, DiagMatched, DiagTaken, DiagAdded);
+        }
+    }
+
+    // 两路都没搬成：返回 0，Tick 据此「不囤额度」。
+    return 0;
+}
+
+void AWTUpgradeCloudDownloader::RecordDownloadSample(int32 Amount, UClass* Item)
+{
+    // 只有真的进了缓冲的件数才算「下载速度」——「取到货但放不下」不是速度，是缓冲堵塞。
+    if (Amount <= 0)
+    {
+        return;
+    }
+    const UWorld* World = GetWorld();
+    if (!World)
+    {
+        return;
+    }
+    const float Now = World->GetTimeSeconds();
+
+    // 先淘汰窗口外的样本。样本数组按时间升序，过期的永远在头部 ⇒ 数出前缀长度批量删，
+    // 不逐条 RemoveAt（每条都会搬动内存）。
+    int32 NumStale = 0;
+    while (NumStale < mPullSamples.Num() && Now - mPullSamples[NumStale].Time > WT_RATE_WINDOW)
+    {
+        ++NumStale;
+    }
+    if (NumStale > 0)
+    {
+        mPullSamples.RemoveAt(0, NumStale);
+    }
+
+    // ★1.0.7p 样本带物品类：面板行内「下载速度」列要按类读（整体读数仍只用 Amount）。
+    mPullSamples.Emplace(Now, Amount, Item);
+}
+
+float AWTUpgradeCloudDownloader::WT_RatePerMinute(const TArray<FWT_PullSample>& Samples,
+                                                  float Now, UClass* OnlyItem)
+{
+    // 窗口内、且（如指定了）属于这一类的样本下标。
+    TArray<int32, TInlineAllocator<8>> Window;
+    for (int32 i = 0; i < Samples.Num(); ++i)
+    {
+        if (Now - Samples[i].Time > AWTUpgradeCloudDownloader::WT_RATE_WINDOW)
+        {
+            continue;
+        }
+        if (OnlyItem && Samples[i].Item.Get() != OnlyItem)
+        {
+            continue;
+        }
+        Window.Add(i);
+    }
+
+    // 只有 1 个（或 0 个）样本时**算不出速率**：那一批货是「从无到有」攒的，
+    // 不知道它代表了多长时间。返回 0 比瞎猜一个虚高值好。
+    if (Window.Num() < 2)
+    {
+        return 0.f;
+    }
+
+    // ★口径（精确版）：**丢掉最老样本的量**，只算它之后的量 ÷ 它到最新样本的时间跨度。
+    //
+    //   为什么不用「窗口内总量 ÷ 窗口长度」：搬运是离散的，5 秒窗口里会落下多个样本
+    //   ⇒ 分子变成 N 组货而分母是 5 秒 ⇒ 系统性高估（实测 3×40 = 120 件 / 5s = 1440/分，
+    //   真值是 40 件/2s = 1200/分）。而「3 个样本」的真实含义是：最老那一组代表它**之前**
+    //   的产量，不属于 [t-4, t] 这段。⇒ 分子只取之后几组，分母取时间跨度（离散积分近似）。
+    int32 Sum = 0;
+    for (int32 k = 1; k < Window.Num(); ++k)
+    {
+        Sum += Samples[Window[k]].Amount;
+    }
+    const float Span = Samples[Window.Last()].Time - Samples[Window[0]].Time;
+    if (Sum <= 0 || Span <= 0.f)
+    {
+        return 0.f;
+    }
+    return static_cast<float>(Sum) * 60.f / Span;
+}
+
+float AWTUpgradeCloudDownloader::GetDownloadRatePerMinute() const
+{
+    const UWorld* World = GetWorld();
+    if (!World || mPullSamples.Num() < 2)
+    {
+        return 0.f;
+    }
+    return WT_RatePerMinute(mPullSamples, World->GetTimeSeconds(), /*OnlyItem=*/nullptr);
+}
+
+void AWTUpgradeCloudDownloader::GetItemRatesPerMinute(TMap<UClass*, float>& OutRates) const
+{
+    OutRates.Reset();
+
+    const UWorld* World = GetWorld();
+    if (!World)
+    {
+        return;
+    }
+    const float Now = World->GetTimeSeconds();
+
+    // 只对「窗口内真的出现过」的类各算一次 —— 窗口里最多几个样本，
+    // 所以这个循环最多跑几次，面板上百行查表即可，不会每行一次 O(样本)。
+    TSet<UClass*> Seen;
+    for (const FWT_PullSample& Sample : mPullSamples)
+    {
+        UClass* Cls = Sample.Item.Get();
+        if (!Cls || Now - Sample.Time > WT_RATE_WINDOW)
+        {
+            continue;
+        }
+        bool bAlready = false;
+        Seen.Add(Cls, &bAlready);
+        if (bAlready)
+        {
+            continue;
+        }
+        const float Rate = WT_RatePerMinute(mPullSamples, Now, Cls);
+        if (Rate > 0.f)
+        {
+            OutRates.Add(Cls, Rate);
+        }
+    }
+}
+
+void AWTUpgradeCloudDownloader::SetOutputFilter(const TArray<TSubclassOf<UFGItemDescriptor>>& InFilter)
+{
+    mOutputFilter.Reset();
+    for (const TSubclassOf<UFGItemDescriptor>& C : InFilter)
+    {
+        // ★判空必须走 Get()：TSubclassOf 没有 operator bool（写了会 C2676）。
+        if (C.Get())
+        {
+            mOutputFilter.AddUnique(C);
+        }
+    }
+
+    // 按类名排 —— 同一份选择无论怎么点出来，存档字节都一致（diff / 比对友好）。
+    mOutputFilter.Sort([](const TSubclassOf<UFGItemDescriptor>& A, const TSubclassOf<UFGItemDescriptor>& B)
+    {
+        const FString AN = A.Get() ? A->GetName() : FString();
+        const FString BN = B.Get() ? B->GetName() : FString();
+        return AN < BN;
+    });
+
+    // ★Warning 级：WT_LOGF 被 WT_LOG_VERBOSE=false 整句编译剔除，Shipping 日志里看不到；
+    //   而「面板选了但机器不按选的搬」正是需要一眼可查的事。
+    // ★1.0.7v 补上前 4 个类名：只报数量时，玩家报「无论选不选都下载」根本分不清是
+    //   「名单为空（=搬全部）」还是「名单里残留多项（老存档多选）」，这两种的修法完全不同。
+    {
+        FString Names;
+        for (int32 i = 0; i < mOutputFilter.Num() && i < 4; ++i)
+        {
+            if (i > 0)
+            {
+                Names += TEXT(", ");
+            }
+            Names += mOutputFilter[i].Get() ? mOutputFilter[i]->GetName() : TEXT("<null>");
+        }
+        if (mOutputFilter.Num() > 4)
+        {
+            Names += TEXT(", ...");
+        }
+        WT_WARNF(TEXT("[cloud-downloader] '%s' output filter <= %d item type(s) [%s]%s"),
+                 *GetName(), mOutputFilter.Num(), *Names,
+                 mOutputFilter.Num() == 0 ? TEXT(" (empty = pull NOTHING; pick an item in the panel)") : TEXT(""));
+    }
+}
+
+void AWTUpgradeCloudDownloader::ToggleOutputItem(TSubclassOf<UFGItemDescriptor> ItemClass)
+{
+    if (!ItemClass.Get())
+    {
+        return;
+    }
+
+    // ★从当前白名单派生新名单再交给 SetOutputFilter —— 保证「增删 + 排序 + 日志」只有一套逻辑。
+    TArray<TSubclassOf<UFGItemDescriptor>> Next = mOutputFilter;
+    if (Next.Remove(ItemClass) == 0)
+    {
+        Next.Add(ItemClass);
+    }
+    SetOutputFilter(Next);
+}
+
+bool AWTUpgradeCloudDownloader::IsOutputAllowed(TSubclassOf<UFGItemDescriptor> ItemClass) const
+{
+    // ★★★1.0.7x 用户 2026-10-27 定案：「列表并未选择任何材料，但仍在下载」—— **未选择 = 一件都不搬**。
+    //
+    // 旧口径（空名单 = 不过滤 = 搬全部）是当初为「老存档不许静默停摆」加的向后兼容，
+    // 但它和面板上「选择」这个动作的语义直接冲突：玩家看到一行都没高亮，机器却在搬货，
+    // 第一反应是 bug（用户原话就是「无论选不选都下载」/「列表并未选择任何材料，但仍在下载」）。
+    // 现在改成显式选择制：必须点行内【选择】指定物品才开搬；点【更换】放开 = 停止搬运。
+    // 发现下载站不动时先看面板标题：显示「未选择（不会下载）」就是没选，不是故障。
+    if (mOutputFilter.Num() == 0)
+    {
+        return false;
+    }
+    return mOutputFilter.Contains(ItemClass);
 }
 
 FText AWTUpgradeCloudDownloader::GetDisplayName()
@@ -1956,17 +3746,182 @@ FText AWTUpgradeCloudDownloader::GetDisplayName()
 // 云端液态上传站 / 云端液态下载站（★0.2.36 新增，用户定案）
 // ----------------------------------------------------------------------------
 
+
+// ----------------------------------------------------------------------------
+// 产能加速器
+// ----------------------------------------------------------------------------
+
+
+
+
+
+    
+
+AWTUpgradeAccelerator::AWTUpgradeAccelerator()
+{
+    // ★★★1.0.7 面板标题修复：纯 C++ 建筑必须自己写 AFGBuildable::mDisplayName（详见 AWTUpgradeStorage ctor）。
+    //   本类已退役（WT_FEATURE_* 相关），但旧存档里还可能有实例，名字照样得补。
+    mDisplayName = GetDisplayName();
+
+    PrimaryActorTick.bCanEverTick = false;
+
+    // 退役建筑保持原样的立方体外观：旧存档里可能还有实例，改模型只会让它们更奇怪。
+    WTMeshSpec Spec;
+    Spec.CubeFallbackScale = FVector(0.9f, 0.9f, 1.4f);
+    WT_CreateMainMesh(this, RootComponent, Spec);
+
+    // The accelerator is a factory building because that is where the boost machinery lives, but it
+    // does no crafting of its own and holds no inventory. Suppressing the build-gun's "needs
+    // ingredients" expectations keeps it from showing an empty recipe slot.
+    mStandingBoost = 2.0f;
+}
+
+void AWTUpgradeAccelerator::ApplyResearchedCapacity()
+{
+    // 生产加速倍率：SetPendingProductionBoost 实时生效，运行时重设即可。
+    const int32 L = WT_GetTrackLevel(GetWorld(), EWTUpgradeTrack::Accelerator);
+    const float Boost = WT_AcceleratorBoostAtLevel(L, WT_GetFinalRoute(GetWorld()));
+    mStandingBoost = Boost;   // 持久化解析值（存档/读档）
+    SetPendingProductionBoost(Boost);
+    WT_LOGF(TEXT("[upgrade] accelerator '%s' Lv%d applied standing boost x%.2f"),
+            *GetName(), L, Boost);
+}
+
+void WT_RefreshResearchedUpgrades(UWorld* World)
+{
+    if (!World)
+    {
+        return;
+    }
+    int32 nB = 0, nS = 0, nD = 0, nA = 0;
+    // ① 电池容量（PowerStorage）：mPowerStoreCapacity / mPowerInputCapacity 被电力系统实时读，改写即生效。
+    for (TActorIterator<AWTUpgradePowerStorage> It(World); It; ++It)
+    {
+        AWTUpgradePowerStorage* B = *It;
+        if (IsValid(B))
+        {
+            B->ApplyResearchedCapacity();
+            ++nB;
+        }
+    }
+    // ② 云端上传站 / ③ 下载站：容量 = 本地缓冲格网，已放置建筑须 Resize 现有库存（只扩不缩，保留货物）。
+    for (TActorIterator<AWTUpgradeStorage> It(World); It; ++It)
+    {
+        AWTUpgradeStorage* S = *It;
+        if (IsValid(S))
+        {
+            S->ApplyResearchedCapacity();
+            ++nS;
+        }
+    }
+    for (TActorIterator<AWTUpgradeCloudDownloader> It(World); It; ++It)
+    {
+        AWTUpgradeCloudDownloader* D = *It;
+        if (IsValid(D))
+        {
+            D->ApplyResearchedCapacity();
+            ++nD;
+        }
+    }
+    // ④ 强化能量碎片（Accelerator）：生产加速倍率，运行时重设即生效。
+    for (TActorIterator<AWTUpgradeAccelerator> It(World); It; ++It)
+    {
+        AWTUpgradeAccelerator* A = *It;
+        if (IsValid(A))
+        {
+            A->ApplyResearchedCapacity();
+            ++nA;
+        }
+    }
+    // ★诊断（临时，确认刷新确实跑到且研究等级被正确读取）：只统计数量 + 当前电池轨等级。
+    WT_WARNF(TEXT("[wt-refresh] called: batteries=%d storage=%d download=%d accel=%d | batteryTrackLv=%d"),
+             nB, nS, nD, nA, WT_GetTrackLevel(World, EWTUpgradeTrack::PowerStorage));
+}
+
+void AWTUpgradeAccelerator::BeginPlay()
+{
+    Super::BeginPlay();
+
+    // Apply the standing boost here rather than only in the constructor. SetPendingProductionBoost
+    // is a virtual that routes through the factory's boost bookkeeping (and recalculates the power
+    // draw that comes with it), so it wants a live, initialised object -- which is exactly what the
+    // constructor does not give us.
+    //
+    // The boost now scales with the player's researched Accelerator level (Dyson-sphere style):
+    // level 1 = 2.0x, rising geometrically and soft-capped at 30x.
+    // 封装成 ApplyResearchedCapacity，使「先放后研究」时研究推进脉冲也能重设倍率。
+    ApplyResearchedCapacity();
+}
+
+FText AWTUpgradeAccelerator::GetDisplayName()
+{
+    return WT_LOCTEXT("Upgrade_Accelerator", "Production Accelerator");
+}
+
+// ----------------------------------------------------------------------------
+// ★1.0.6 恢复：云端液态上传/下载站（方孔处接原版缓冲罐的管道接口）
+// ----------------------------------------------------------------------------
+
+// 圆口视觉件：云端建模不动，把原版圆形管道口小件 SM_Pipe_InPut_01 叠在管道锚点外侧。
+// 一手依据（HadronCollider 同款相对关系）：向外 10cm、Yaw = 连接Yaw − 90。
+static void WT_AddRoundPortVisual(AActor* Self, const TCHAR* CompName, const UFGPipeConnectionComponent* Pipe,
+                                   UStaticMeshComponent* SourceMesh = nullptr)
+{
+    if (!Self || !Pipe || !Self->GetRootComponent())
+    {
+        return;
+    }
+    UStaticMesh* PortMesh = LoadObject<UStaticMesh>(nullptr,
+        TEXT("/Game/FactoryGame/Buildable/Factory/FactoryInputs/Mesh/SM_Pipe_InPut_01.SM_Pipe_InPut_01"));
+    if (!PortMesh)
+    {
+        return; // 视觉件加载失败只影响观感，管道功能不受影响（构造期不刷日志）。
+    }
+    UStaticMeshComponent* Port = Self->CreateDefaultSubobject<UStaticMeshComponent>(CompName);
+    if (!Port)
+    {
+        return;
+    }
+    Port->SetupAttachment(Self->GetRootComponent());
+    Port->SetStaticMesh(PortMesh);
+    Port->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    // ★1.0.8AU 白圈修复（用户实拍：蓝图投影里多一个白圈）：SM_Pipe_InPut_01 资产本身不带材质
+    //   （白模），且全息预览不会给这个额外子组件套幽灵材质，于是预览/实机里都渲染成默认白。
+    //   把已抄好原版仓库材质的主网格材质补到圆口件的空槽位上（原版自带材质若存在则保留），
+    //   保证这个法兰圈永远不是白模。
+    if (SourceMesh)
+    {
+        const int32 NumSlots = Port->GetNumMaterials();
+        const int32 SrcSlots = SourceMesh->GetNumMaterials();
+        for (int32 i = 0; i < NumSlots; ++i)
+        {
+            if (!Port->GetMaterial(i) && SrcSlots > 0)
+            {
+                if (UMaterialInterface* MI = SourceMesh->GetMaterial(FMath::Min(i, SrcSlots - 1)))
+                {
+                    Port->SetMaterial(i, MI);
+                }
+            }
+        }
+    }
+
+    // 照抄一手相对关系：向外 40cm（★2026-11-08 用户定：10→20→25→30→35→再外推 5 = 40）、Yaw = 连接Yaw − 90。
+    const FRotator ConnRot = Pipe->GetRelativeRotation();
+    const float YawRad = FMath::DegreesToRadians(ConnRot.Yaw);
+    const FVector Outward(FMath::Cos(YawRad), FMath::Sin(YawRad), 0.f);
+    Port->SetRelativeLocation(Pipe->GetRelativeLocation() + Outward * 40.f);
+    Port->SetRelativeRotation(FRotator(0.f, ConnRot.Yaw - 90.f, 0.f));
+}
+
 AWTUpgradeCloudFluidUploader::AWTUpgradeCloudFluidUploader()
 {
     PrimaryActorTick.bCanEverTick = true;
 
-    // ★0.2.48 识别色（原生喷漆槽，见 DefaultGame.ini mDefaultColorSlots：槽4=青=冷色组）。
-    //   四机配色：仓库=黄(2)、下载器=红(1)、流体上传=青(4)、流体下载=蓝(5)。
-    mColorSlot = 4;   // 冷色组（流体机）
+    // 识别色（原生喷漆槽，槽4=青）：流体机冷色组。
+    mColorSlot = 4;
 
-    // ★0.2.48 外观（用户定案 2026-10-10「建模不应该是云端建模吗」）：主体保持**云端建模**
-    //   （SM_CentralStorage_01，与固态两站同款、同 180° 朝向修正），整栋不再换成储罐网格。
-    //   圆口视觉由构造器末尾的端口小件叠加（WT_AddRoundPortVisual，一手依据见其注释）。
+    // 主体保持云端建模（SM_CentralStorage_01，与固态两站同款、同 180° 朝向），圆口视觉件另行叠加。
     static ConstructorHelpers::FObjectFinder<UStaticMesh> DepotMesh(
         TEXT("/Game/FactoryGame/Buildable/Factory/CentralStorage/Mesh/SM_CentralStorage_01.SM_CentralStorage_01"));
 
@@ -1975,8 +3930,6 @@ AWTUpgradeCloudFluidUploader::AWTUpgradeCloudFluidUploader()
     Spec.FootprintXY = 0.f;                                // 0 = 保持模型原始比例（原版尺寸）
     Spec.CubeFallbackScale = FVector(5.f, 9.f, 4.23f);     // 立方体兜底：500 x 900 x 423 uu
     UStaticMeshComponent* MeshComp = WT_CreateMainMesh(this, RootComponent, Spec);
-    // ★0.2.48 A 修正（一手数据 `_cs_ports.py` 解析 Build_CentralStorage.uasset 实锤）：
-    //   原版 MainMesh_GEN_VARIABLE 自带 RelativeRotation (0,180,0)；只转 mesh、不动端口（同固态两站）。
     if (MeshComp)
     {
         MeshComp->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
@@ -1984,44 +3937,49 @@ AWTUpgradeCloudFluidUploader::AWTUpgradeCloudFluidUploader()
 
     WT_SetClearance(this, 250.f, 450.f, 423.f);
 
-    // ★0.2.36b 管道接口 ×2（原版缓存罐 BeginPlay 索引第 2 个接口，1 个必崩；两个口必须都存在，见 §36）。
-    //   类型 PCT_ANY（取货走 Factory_PullPipeInput，与类型无关），余量 1.5m。
-    //   固定摆原版仓库口坐标 (0,390,100)/Yaw90（与固态两站一致；圆口视觉件也钉在这）。
+    // 管道接口 ×2（原版缓存罐 BeginPlay 索引第 2 个接口，1 个必崩）。类型 PCT_ANY，余量 1.5m。
+    // 固定摆原版仓库口坐标 (0,390,100)/Yaw90（与固态两站一致，方向一致：从本地管网吸入进云端）。
     mPipeInA = CreateDefaultSubobject<UFGPipeConnectionComponent>(TEXT("WTFluidInA"));
     mPipeInA->SetupAttachment(RootComponent);
-    mPipeInA->SetRelativeLocation(WT_VANILLA_PORT_LOC);
+    mPipeInA->SetRelativeLocation(WT_FLUID_PORT_LOC);
     mPipeInA->SetRelativeRotation(WT_VANILLA_PORT_ROT);
     mPipeInA->SetPipeConnectionType(EPipeConnectionType::PCT_ANY);
     mPipeInA->SetConnectorClearance(150.f);
 
     mPipeInB = CreateDefaultSubobject<UFGPipeConnectionComponent>(TEXT("WTFluidInB"));
     mPipeInB->SetupAttachment(RootComponent);
-    mPipeInB->SetRelativeLocation(WT_VANILLA_PORT_LOC);
+    mPipeInB->SetRelativeLocation(WT_FLUID_PORT_LOC);
     mPipeInB->SetRelativeRotation(WT_VANILLA_PORT_ROT);
     mPipeInB->SetPipeConnectionType(EPipeConnectionType::PCT_ANY);
     mPipeInB->SetConnectorClearance(150.f);
 
-    // 面板：★0.2.36b 用户定案「云端用云端的」—— 上传站用原版**云端面板**（位面存储站上传器）。
+    // 上传站：原版云端站 CDO 只用来抄材质（白模修复），面板不再复用原版位面存储站 UMG
+    // （它绑定的是存储库存，上传站是管道缓冲罐、无该库存 → 复用会弹空/不弹）。
+    // ★1.0.8AU 改用我们的原生只读状态面板（看云端液态云库存）。
     UClass* VanillaDepot = WT_FindVanillaClass(
         TEXT("/Game/FactoryGame/Buildable/Factory/CentralStorage/Build_CentralStorage.Build_CentralStorage_C"),
         TEXT("Build_CentralStorage_C"), AFGBuildable::StaticClass());
     if (VanillaDepot)
     {
         VanillaDepot->AddToRoot();
-        // ★0.2.48 白模修复：恢复云端建模后，同固态两站一样从原版云端站 CDO 抄材质。
         WT_CopyVanillaMeshMaterials(VanillaDepot, MeshComp);
-        WT_ReuseVanillaInteractWidget(this, VanillaDepot);
     }
+    WT_UseNativeInteractPanel(this, UWTFluidStatusPanelWidget::StaticClass());
 
-    // ★0.2.48 圆口视觉件：云端建模不动，把原版圆形管道口小件叠在管道锚点外侧。
-    //   两根管道口同坐标（(0,390,100) 叠放），视觉件只需一个。
-    WT_AddRoundPortVisual(this, TEXT("WTRoundPortIn"), mPipeInA.Get());
+    // 圆口视觉件：管道锚点外侧叠原版圆形管道口小件。两根管道口同坐标，视觉件只需一个。
+    // ★1.0.8AU 传入主网格（已抄原版仓库材质）用于给圆口件补材质，消除蓝图投影里的白圈。
+    WT_AddRoundPortVisual(this, TEXT("WTRoundPortIn"), mPipeInA.Get(), MeshComp);
 }
 
 void AWTUpgradeCloudFluidUploader::BeginPlay()
 {
     Super::BeginPlay();
-    WT_LogConnectionPorts(this, TEXT("ports-fluid-up"));   // ★0.2.42 接口可见性取证
+    WT_LogConnectionPorts(this, TEXT("ports-fluid-up"));
+
+    // ★1.0.8AU 与下载站同理：父类 AFGBuildablePipeReservoir 可能在 BeginPlay 复位交互状态，
+    //   这里重挂我们的原生只读状态面板兜底（构造函数里那次可能被覆盖）。
+    WT_UseNativeInteractPanel(this, UWTFluidStatusPanelWidget::StaticClass());
+
     WT_LOGF(TEXT("[upgrade] fluid uploader '%s' online."), *GetName());
 }
 
@@ -2056,8 +4014,7 @@ void AWTUpgradeCloudFluidUploader::Tick(float dt)
 void AWTUpgradeCloudFluidUploader::TryUploadToCloud(float dt)
 {
     WT_ZONE(TEXT("Upgrade.FluidUploader.TryUpload"));
-    // ★0.2.36b（用户定案）：固液分开 —— 流体记进**我们自己的液态账本**，不进原版池；
-    // 下载站「原版池优先、池空才动我们的账本」。
+    // 流体记进我们自己的液态账本，不进原版池（用户定案「云端固液分开」）。
     UFGPipeConnectionComponent* Conns[] = { mPipeInA.Get(), mPipeInB.Get() };
     for (UFGPipeConnectionComponent* Conn : Conns)
     {
@@ -2118,21 +4075,18 @@ AWTUpgradeCloudFluidDownloader::AWTUpgradeCloudFluidDownloader()
 {
     PrimaryActorTick.bCanEverTick = true;
 
-    // ★0.2.48 识别色（原生喷漆槽，见 DefaultGame.ini mDefaultColorSlots：槽5=蓝=冷色组）。
-    //   四机配色：仓库=黄(2)、下载器=红(1)、流体上传=青(4)、流体下载=蓝(5)。
-    mColorSlot = 5;   // 冷色组（流体机）
+    // 识别色（原生喷漆槽，槽5=蓝）：流体机冷色组。
+    mColorSlot = 5;
 
-    // ★0.2.48 外观（用户定案 2026-10-10）：主体保持**云端建模**（同上传站/固态两站），整栋不再换成储罐网格。
-    //   圆口视觉由构造器末尾的端口小件叠加（WT_AddRoundPortVisual，一手依据见其注释）。
+    // 主体保持云端建模（同上传站/固态两站）。
     static ConstructorHelpers::FObjectFinder<UStaticMesh> DepotMesh(
         TEXT("/Game/FactoryGame/Buildable/Factory/CentralStorage/Mesh/SM_CentralStorage_01.SM_CentralStorage_01"));
 
     WTMeshSpec Spec;
     Spec.Mesh = DepotMesh.Object;
-    Spec.FootprintXY = 0.f;                                // 0 = 保持模型原始比例（原版尺寸）
-    Spec.CubeFallbackScale = FVector(5.f, 9.f, 4.23f);     // 立方体兜底：500 x 900 x 423 uu
+    Spec.FootprintXY = 0.f;
+    Spec.CubeFallbackScale = FVector(5.f, 9.f, 4.23f);
     UStaticMeshComponent* MeshComp = WT_CreateMainMesh(this, RootComponent, Spec);
-    // ★0.2.48 A 修正：原版 MainMesh 自带 (0,180,0)；只转 mesh、不动端口（同固态两站）。
     if (MeshComp)
     {
         MeshComp->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
@@ -2140,23 +4094,23 @@ AWTUpgradeCloudFluidDownloader::AWTUpgradeCloudFluidDownloader()
 
     WT_SetClearance(this, 250.f, 450.f, 423.f);
 
-    // ★0.2.36b 双接口（原版缓存罐 BeginPlay 索引第 2 个接口，1 个必崩；两个口必须都存在，见 §36）。
-    //   下载站 = 生产端（向管网供货）。类型 PCT_ANY、余量 1.5m。固定摆原版仓库口坐标 (0,390,100)/Yaw90。
+    // 双接口（原版缓存罐 BeginPlay 索引第 2 个接口，1 个必崩）。下载站 = 生产端（向管网供货）。
+    // 类型 PCT_ANY、余量 1.5m。固定摆原版仓库口坐标 (0,390,100)/Yaw90，方向一致（从云端排进本地管网）。
     mPipeOutA = CreateDefaultSubobject<UFGPipeConnectionComponent>(TEXT("WTFluidOutA"));
     mPipeOutA->SetupAttachment(RootComponent);
-    mPipeOutA->SetRelativeLocation(WT_VANILLA_PORT_LOC);
+    mPipeOutA->SetRelativeLocation(WT_FLUID_PORT_LOC);
     mPipeOutA->SetRelativeRotation(WT_VANILLA_PORT_ROT);
     mPipeOutA->SetPipeConnectionType(EPipeConnectionType::PCT_ANY);
     mPipeOutA->SetConnectorClearance(150.f);
 
     mPipeOutB = CreateDefaultSubobject<UFGPipeConnectionComponent>(TEXT("WTFluidOutB"));
     mPipeOutB->SetupAttachment(RootComponent);
-    mPipeOutB->SetRelativeLocation(WT_VANILLA_PORT_LOC);
+    mPipeOutB->SetRelativeLocation(WT_FLUID_PORT_LOC);
     mPipeOutB->SetRelativeRotation(WT_VANILLA_PORT_ROT);
     mPipeOutB->SetPipeConnectionType(EPipeConnectionType::PCT_ANY);
     mPipeOutB->SetConnectorClearance(150.f);
 
-    // ★0.2.36b 白模修复：恢复云端建模后，同固态两站一样从原版云端站 CDO 抄材质。
+    // 白模修复：同固态两站一样从原版云端站 CDO 抄材质。
     if (UClass* VanillaDepot = WT_FindVanillaClass(
             TEXT("/Game/FactoryGame/Buildable/Factory/CentralStorage/Build_CentralStorage.Build_CentralStorage_C"),
             TEXT("Build_CentralStorage_C"), AFGBuildable::StaticClass()))
@@ -2165,17 +4119,24 @@ AWTUpgradeCloudFluidDownloader::AWTUpgradeCloudFluidDownloader()
         WT_CopyVanillaMeshMaterials(VanillaDepot, MeshComp);
     }
 
-    // ★0.2.48 圆口视觉件：云端建模不动，把原版圆形管道口小件叠在管道锚点外侧。
-    WT_AddRoundPortVisual(this, TEXT("WTRoundPortOut"), mPipeOutA.Get());
+    // 圆口视觉件：管道锚点外侧叠原版圆形管道口小件。
+    // ★1.0.8AU 传入主网格（已抄原版仓库材质）用于给圆口件补材质，消除蓝图投影里的白圈。
+    WT_AddRoundPortVisual(this, TEXT("WTRoundPortOut"), mPipeOutA.Get(), MeshComp);
 
-    // 面板：★0.2.36b 选型面板（流体类型），保持我们自己的原生选型面板。
+    // 面板：流体选型面板（我们自己的原生选型面板，枚举我们自己的液态云）。
     WT_UseNativeInteractPanel(this, UWTFluidSelectPanelWidget::StaticClass());
 }
 
 void AWTUpgradeCloudFluidDownloader::BeginPlay()
 {
     Super::BeginPlay();
-    WT_LogConnectionPorts(this, TEXT("ports-fluid-down"));   // ★0.2.42 接口可见性取证
+    WT_LogConnectionPorts(this, TEXT("ports-fluid-down"));
+
+    // ★1.0.8AU 面板修复（用户实测按 E 弹不出流体选型面板）：AFGBuildablePipeReservoir 在 BeginPlay
+    //   阶段可能把交互可用性 / 面板类复位。这里在 BeginPlay 里重挂我们的原生流体选型面板，确保
+    //   mIsUseable + mInteractWidgetSoftClass 在任何父类初始化之后都生效（构造函数里的那次可能被覆盖）。
+    WT_UseNativeInteractPanel(this, UWTFluidSelectPanelWidget::StaticClass());
+
     WT_LOGF(TEXT("[upgrade] fluid downloader '%s' online (selected=%s)."),
             *GetName(),
             mSelectedFluidClass ? *mSelectedFluidClass->GetName() : TEXT("<none>"));
@@ -2237,7 +4198,6 @@ void AWTUpgradeCloudFluidDownloader::TryDownloadFromCloud(float dt)
         const int32 Available = Sub->GetNumItemsFromCentralStorage(mSelectedFluidClass);
         if (Available > 0)
         {
-            // 每周期最多 50 件（温和下载，与固态站"一周期一组"同一节奏哲学）。
             Removed = Sub->TryRemoveItemsFromCentralStorage(mSelectedFluidClass,
                                                             FMath::Min(Available, 50));
             if (Removed > 0)
@@ -2329,50 +4289,6 @@ FText AWTUpgradeCloudFluidDownloader::GetDisplayName()
 }
 
 // ----------------------------------------------------------------------------
-// 产能加速器
-// ----------------------------------------------------------------------------
-
-AWTUpgradeAccelerator::AWTUpgradeAccelerator()
-{
-    PrimaryActorTick.bCanEverTick = false;
-
-    // 退役建筑保持原样的立方体外观：旧存档里可能还有实例，改模型只会让它们更奇怪。
-    WTMeshSpec Spec;
-    Spec.CubeFallbackScale = FVector(0.9f, 0.9f, 1.4f);
-    WT_CreateMainMesh(this, RootComponent, Spec);
-
-    // The accelerator is a factory building because that is where the boost machinery lives, but it
-    // does no crafting of its own and holds no inventory. Suppressing the build-gun's "needs
-    // ingredients" expectations keeps it from showing an empty recipe slot.
-    mStandingBoost = 2.0f;
-}
-
-void AWTUpgradeAccelerator::BeginPlay()
-{
-    Super::BeginPlay();
-
-    // Apply the standing boost here rather than only in the constructor. SetPendingProductionBoost
-    // is a virtual that routes through the factory's boost bookkeeping (and recalculates the power
-    // draw that comes with it), so it wants a live, initialised object -- which is exactly what the
-    // constructor does not give us.
-    //
-    // The boost now scales with the player's researched Accelerator level (Dyson-sphere style):
-    // level 1 = 2.0x, rising geometrically and soft-capped at 30x.
-    const int32 L = WT_GetTrackLevel(GetWorld(), EWTUpgradeTrack::Accelerator);
-    const float Boost = WT_AcceleratorBoostAtLevel(L, WT_GetFinalRoute(GetWorld()));
-    mStandingBoost = Boost;   // persist the resolved value for save/load
-    SetPendingProductionBoost(Boost);
-
-    WT_LOGF(TEXT("[upgrade] accelerator '%s' Lv%d applied standing boost x%.2f"),
-            *GetName(), L, Boost);
-}
-
-FText AWTUpgradeAccelerator::GetDisplayName()
-{
-    return WT_LOCTEXT("Upgrade_Accelerator", "Production Accelerator");
-}
-
-// ----------------------------------------------------------------------------
 // Predicates + registration
 // ----------------------------------------------------------------------------
 
@@ -2388,9 +4304,10 @@ namespace Remote_FactoryUpgrades
         return Class && Class->IsChildOf(AWTUpgradeStorage::StaticClass());
     }
 
-    bool IsUpgradeCloudDownloader(const UClass* Class)
+
+    bool IsUpgradeAccelerator(const UClass* Class)
     {
-        return Class && Class->IsChildOf(AWTUpgradeCloudDownloader::StaticClass());
+        return Class && Class->IsChildOf(AWTUpgradeAccelerator::StaticClass());
     }
 
     bool IsUpgradeCloudFluidUploader(const UClass* Class)
@@ -2403,16 +4320,12 @@ namespace Remote_FactoryUpgrades
         return Class && Class->IsChildOf(AWTUpgradeCloudFluidDownloader::StaticClass());
     }
 
-    bool IsUpgradeAccelerator(const UClass* Class)
-    {
-        return Class && Class->IsChildOf(AWTUpgradeAccelerator::StaticClass());
-    }
-
     bool IsUpgradeBuilding(const UClass* Class)
     {
         return IsUpgradePowerStorage(Class) || IsUpgradeStorage(Class)
-            || IsUpgradeCloudDownloader(Class) || IsUpgradeCloudFluidUploader(Class)
-            || IsUpgradeCloudFluidDownloader(Class) || IsUpgradeAccelerator(Class);
+            || IsUpgradeAccelerator(Class)
+            || IsUpgradeCloudFluidUploader(Class)
+            || IsUpgradeCloudFluidDownloader(Class);
     }
 
     float MaxProductionBoost()
@@ -2479,10 +4392,15 @@ namespace Remote_FactoryUpgrades
                     for (const TSubclassOf<UFGItemDescriptor>& Cls : Classes)
                     {
                         UClass* Raw = Cls.Get();
-                        if (!Raw || WT_PoolAmount(W, Raw) > 0)
+                        if (!Raw)
                         {
-                            continue;   // 原版云端有这类货 —— 我们的账本按兵不动
+                            continue;
                         }
+
+                        // ★1.0.6（消失 bug 修复）：这里**不再**用「原版池里这一类为 0」做前置条件。
+                        //   旧条件是「原版有就不动账本」，实际效果是：只要原版云里存过一块铁板，
+                        //   之后所有铁板就永远锁死在账本里、面板看不见 ⇒ 玩家眼里的「凭空消失」。
+                        //   现在无条件尝试迁移，收不收由原版自己判（配额满时返回 0，货原样退回账本）。
                         const int32 Take = Station->TakeFromLedger(Cls, 100);
                         if (Take > 0)
                         {
@@ -2492,9 +4410,9 @@ namespace Remote_FactoryUpgrades
                                 // 原版没收下的部分原样退回账本（防丢料）。
                                 Station->AddToLedger(Cls, Take - FMath::Max(0, Injected));
                             }
-                            WT_LOGF(TEXT("[cloud-fallback] vanilla cloud empty of %s -- injected %d "
-                                         "from '%s' (accepted=%d)."),
-                                    *Raw->GetName(), Take, *Station->GetName(), Injected);
+                            WT_WARNF(TEXT("[cloud-fallback] migrated %d/%d x %s from '%s' ledger "
+                                          "into vanilla central storage."),
+                                     FMath::Max(0, Injected), Take, *Raw->GetName(), *Station->GetName());
                         }
                     }
                 }

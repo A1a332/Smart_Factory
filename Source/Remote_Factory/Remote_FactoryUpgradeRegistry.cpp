@@ -18,11 +18,22 @@
 #include "Unlocks/FGUnlockRecipe.h"
 #include "Unlocks/FGUnlockGiveItem.h"   // ★0.2.36h 商店发货解锁（UFGUnlockGiveItem，abstract）
 #include "FGSchematic.h"
+#include "FGResearchTree.h"            // ★2026-11-07 #45：读原版研究树首节点 schematic 的 mSchematicIcon.ImageSize 作基准
+#include "FGResearchTreeNode.h"        // ★2026-11-07 #45：调 UFGResearchTreeNode::GetNodeSchematic() 需完整声明
 #include "Equipment/FGBuildGun.h"
 #include "Buildables/FGBuildable.h"          // ★0.2.37 WT_FindConstructorMk1Class 的基类过滤
 #include "Buildables/FGBuildableFactory.h"
+// ★1.0.7 制作台（手工台）绑定：UFGWorkBench 是**组件**（FGWorkBench.h:16
+// `class UFGWorkBench : public USceneComponent, public IFGRecipeProducerInterface`），
+// 手工配方的 producer 判据挂在它身上（GetRecipeProducerItemDescriptor 返回 ItemDescriptor，
+// FGWorkBench.h:28），与机器（Buildable 类）不是同一套 ⇒ 必须 include 才能按基类解析。
+#include "FGWorkBench.h"
 #include "Engine/World.h"
 #include "Engine/Texture2D.h"
+// ★2026-11-05：直接操作 FSlateBrush（mSchematicIcon）。本模块 Build.cs 已依赖 SlateCore（:48-49）。
+//   用于补 UVRegion —— 凭空 NewObject 的 brush 该字段是 (0,0)-(0,0) 但 bIsValid=true，
+//   Slate 会据此采样单点 ⇒ 渲染成纯色块（MAM 节点「空方块」的最后一环）。
+#include "Styling/SlateBrush.h"
 #include "EngineUtils.h"
 #include "Containers/Ticker.h"
 
@@ -199,8 +210,7 @@ UWTUpgradeCloudFluidUploaderDescriptor::UWTUpgradeCloudFluidUploaderDescriptor()
     HologramClass = AWTUpgradeCloudFluidUploaderHologram::StaticClass();
     DisplayName = AWTUpgradeCloudFluidUploader::GetDisplayName();
     Desc = WT_LOCTEXT("Desc_UpgradeCloudFluidUploader",
-        "Attach a pipe and every cubic meter that arrives is uploaded into the cloud pool as its "
-        "own fluid entry -- liquids and gases are accounted separately from solid items.");
+        "云端流体上传站：把本地管网的流体吸入，记入我们自己的液态账本云（跨存档/跨地图共享）。");
     InitCommon();
 }
 
@@ -210,10 +220,10 @@ UWTUpgradeCloudFluidDownloaderDescriptor::UWTUpgradeCloudFluidDownloaderDescript
     HologramClass = AWTUpgradeCloudFluidDownloaderHologram::StaticClass();
     DisplayName = AWTUpgradeCloudFluidDownloader::GetDisplayName();
     Desc = WT_LOCTEXT("Desc_UpgradeCloudFluidDownloader",
-        "Press E to pick which fluid the cloud should send back out, then attach a pipe: the "
-        "station feeds the selected fluid into the network as long as the cloud holds stock.");
+        "云端流体下载站：从液态账本云把流体排进本地管网。按 E 打开流体选型面板，选好要抽的流体后持续输出。");
     InitCommon();
 }
+
 
 // ----------------------------------------------------------------------------
 // 强化能量碎片（★0.2.36 落地）
@@ -448,6 +458,16 @@ namespace
     /** Same trick for mProducedIn: take the array, not the object. */
     void FillProducedIn(TArray<TSoftClassPtr<UObject>>& OutProducedIn, UClass* BuildGunClass)
     {
+        // ★1.0.7w 硬门禁（同 WT_FindCraftBenchProducers 的长注释）：mProducedIn 的元素必须实现
+        //   IFGRecipeProducerInterface。非法类在这里被当成"没解析到"，走下面的软路径兜底 ——
+        //   宁可配方挂不上去（玩家看不到，但不崩），也绝不让鼠标掠过产物就 Assert 崩游戏。
+        if (BuildGunClass
+            && !BuildGunClass->ImplementsInterface(UFGRecipeProducerInterface::StaticClass()))
+        {
+            WT_ERRF(TEXT("[shard] FillProducedIn: REFUSED %s (no IFGRecipeProducerInterface)."),
+                    *BuildGunClass->GetPathName());
+            BuildGunClass = nullptr;
+        }
         if (!BuildGunClass)
         {
             // ★修复（用户实测「构造机/量子编码器里找不到强化碎片配方」）：调用方（WT_Find*Class）若在
@@ -458,6 +478,12 @@ namespace
             {
                 if (UClass* Resolved = Soft.Get())
                 {
+                    if (!Resolved->ImplementsInterface(UFGRecipeProducerInterface::StaticClass()))
+                    {
+                        WT_ERRF(TEXT("[shard] FillProducedIn: skipped soft path %s "
+                                     "(no IFGRecipeProducerInterface)."), *Resolved->GetPathName());
+                        continue;
+                    }
                     BuildGunClass = Resolved;
                     break;
                 }
@@ -643,7 +669,6 @@ void UWTUpgradeCloudFluidUploaderRecipe::ApplyProducedIn(UClass* BuildGunClass)
 
 void UWTUpgradeCloudFluidUploaderRecipe::ApplyIngredients()
 {
-    // 用户定案：所有云端站建造 = 原版同序（0.2.45 起三样，不含梅瑟尔球）+ 1 强化碎片（共用 GUploadStationCost）。
     FillIngredients(mIngredients, GUploadStationCost, UE_ARRAY_COUNT(GUploadStationCost),
                     TEXT("cloud fluid uploader"));
     mIngredients.Add(FItemAmount(UWTUpgradePowerShardDescriptor::StaticClass(), 1));
@@ -666,6 +691,8 @@ void UWTUpgradeCloudFluidDownloaderRecipe::ApplyIngredients()
                     TEXT("cloud fluid downloader"));
     mIngredients.Add(FItemAmount(UWTUpgradePowerShardDescriptor::StaticClass(), 1));
 }
+
+
 
 // ----------------------------------------------------------------------------
 // ★0.2.39 强化能量碎片配方（用户最终定案：**两条**）。
@@ -814,6 +841,129 @@ namespace
             WT_WARNF(TEXT("[shard] quantum encoder class unresolved -- synth recipe keeps soft path only."));
         }
         return Cached;
+    }
+
+    /**
+     * ★1.0.7 制作台（手工台）生产者类解析 —— ③ 号配方的 mProducedIn 候选集合。
+     *
+     * ## 为什么不能只解析「一个类」（一手核实 FGRecipe.h / FGWorkBench.h）
+     * `mProducedIn` 的元素类型是 **TSoftClassPtr<UObject>**（FGRecipe.h:181，
+     * `Meta = (MustImplement = "FGRecipeProducerInterface")`），原版允许两种写法：
+     *   ① **建筑类** `Build_WorkBench_C` / `Build_WorkBenchIntegrated_C`
+     *      —— 构造机就是走这条（已实测可用：碎片配方在构造机里能看到）。
+     *   ② **工作台组件 BP 类**（`UFGWorkBench` 自身实现 IFGRecipeProducerInterface，FGWorkBench.h:16；
+     *      utoc 名表里实证有 `BP_WorkBenchComponent.uasset`）。
+     *
+     * ★★1.0.7w 已**删除**原第 ② 项「建筑物品描述符 Desc_WorkBench_C」—— 那是错的：
+     *   它只是 UFGItemDescriptor 子类，不实现 IFGRecipeProducerInterface，而元数据要求实现。
+     *   写进 mProducedIn 后原版 tooltip 会 Execute_ 崩游戏（2026-10-27 10:52 实测崩溃，
+     *   [shard-probe] 日志实证当时 6 条 producer，其中 2 条就是描述符）。
+     *
+     * 到底哪一项匹配，只能靠运行时 `AFGRecipeManager::GetAvailableRecipesForProducer` 反查
+     * （探针在 RegisterUpgradeRecipes 里，日志前缀 `[shard-probe]`）。
+     * ⇒ 三套全挂：多挂的项不会被 RecipeManager 报错（它只是遍历比较），只要一项命中配方就出现。
+     *
+     * 解析顺序：权威资产路径 → 按类名扫迭代器兜底（四个 uasset 名均已在 utoc 名表实锤）。
+     * 命中即 AddToRoot（0.2.7 台账：裸 UClass* 不是 GC 引用）。全失败返回空数组，调用方保留软路径。
+     */
+    void WT_FindCraftBenchProducers(TArray<UClass*>& OutClasses)
+    {
+        OutClasses.Reset();
+
+        // ★★1.0.7w 硬门禁：mProducedIn 的元素**必须实现 IFGRecipeProducerInterface**。
+        //
+        // 一手依据：`UFGRecipe::mProducedIn` 的声明是
+        //   `UPROPERTY( Meta = (MustImplement = "FGRecipeProducerInterface") )`
+        //   （FGRecipe.h:181，SML SDK 里逐字可查）。
+        // 这个 meta 不只是编辑器提示 —— 原版运行时**到处**会直接
+        //   `IFGRecipeProducerInterface::Execute_GetRecipeProducerItemDescriptor(Producer->GetDefaultObject(), ...)`
+        // 而不预先判空/判接口，`Execute_` 内部第一行就是
+        //   `checkf(O->GetClass()->ImplementsInterface(UFGRecipeProducerInterface::StaticClass()), ...)`
+        //   （FGRecipeProducerInterface.gen.cpp:46）。
+        //
+        // 实测代价（2026-10-27 10:52 崩溃包 UECC-Windows-16C0CD1A...）：
+        //   我们曾把 **`Desc_WorkBench_C` / `Desc_WorkBenchIntegrated_C`（UFGItemDescriptor 子类）**
+        //   塞进 recipe3 的 mProducedIn（[shard-probe] 日志实证 6 条），它们不实现该接口。
+        //   原先以为「RecipeManager 反查只是比较指针、不崩」是对的，但**原版物品 tooltip**
+        //   会遍历产物的所有配方的 mProducedIn 逐个 Execute_ 取产出图标 ⇒
+        //   玩家鼠标掠过强化碎片的那一刻直接 Assert 崩游戏。功能"能用"≠"合法"。
+        auto AddCandidate = [&OutClasses](UClass* C)
+        {
+            if (!C)
+            {
+                return;
+            }
+            if (!C->ImplementsInterface(UFGRecipeProducerInterface::StaticClass()))
+            {
+                // 宁可少一个候选（配方挂不上去 = 玩家看不到，但不崩），
+                // 也绝不把非法类写进 mProducedIn（= 鼠标一靠近就崩游戏）。
+                WT_WARNF(TEXT("[shard] REFUSED producer candidate %s: does not implement "
+                              "IFGRecipeProducerInterface (would crash the vanilla tooltip)."),
+                         *C->GetPathName());
+                return;
+            }
+            C->AddToRoot();
+            OutClasses.AddUnique(C);
+        };
+
+        // ① 建筑类（可建造制作台 / 枢纽内置制作台）。
+        AddCandidate(StaticLoadClass(AFGBuildable::StaticClass(), nullptr,
+            TEXT("/Game/FactoryGame/Buildable/Factory/WorkBench/Build_WorkBench.Build_WorkBench_C")));
+        AddCandidate(StaticLoadClass(AFGBuildable::StaticClass(), nullptr,
+            TEXT("/Game/FactoryGame/Buildable/Factory/WorkBench/Build_WorkBenchIntegrated"
+                 ".Build_WorkBenchIntegrated_C")));
+
+        // ② 建筑物品描述符 —— ★1.0.7w 已**删除**（原来此处解析 Desc_WorkBench_C /
+        //    Desc_WorkBenchIntegrated_C 并挂进 mProducedIn）。它们只是物品描述符，
+        //    不实现 IFGRecipeProducerInterface，是 10:52 那次 tooltip 崩溃的直接来源。
+        //    当时"线索"（`UFGWorkBench::GetRecipeProducerItemDescriptor_Implementation` 返回
+        //    ItemDescriptor）被误读成"producer 判据走描述符"：那个返回值只是「我这个生产者对应
+        //    哪个物品图标」，与 mProducedIn 的类型约束毫无关系。
+
+        // ③ 工作台组件 BP 类（路径为推断；解析不到由下面的名字扫描兜住）。
+        AddCandidate(StaticLoadClass(UFGWorkBench::StaticClass(), nullptr,
+            TEXT("/Game/FactoryGame/Buildable/Factory/WorkBench/BP_WorkBenchComponent"
+                 ".BP_WorkBenchComponent_C")));
+
+        // ---- 名字兜底：补齐上面没解析到的（按类名精确匹配，绝不宽泛 Contains 收错类）----
+        for (TObjectIterator<UClass> It; It; ++It)
+        {
+            UClass* C = *It;
+            if (C->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists))
+            {
+                continue;
+            }
+            const FString Name = C->GetName();
+            if (Name.Contains(TEXT("Automated")))   // 自动化装备工作台是另一套机器，不能挂进来
+            {
+                continue;
+            }
+
+            const bool bBenchBuildable =
+                C->IsChildOf(AFGBuildable::StaticClass())
+                && (Name.Equals(TEXT("Build_WorkBench_C"))
+                    || Name.Equals(TEXT("Build_WorkBenchIntegrated_C")));
+
+            // ★1.0.7w 名字兜底里**也**不再收物品描述符（Desc_WorkBench_C 一类）：
+            //   与上面 ② 同一个理由 —— 它们不实现 IFGRecipeProducerInterface。
+            const bool bBenchComponent =
+                C->IsChildOf(UFGWorkBench::StaticClass())
+                && Name.Contains(TEXT("WorkBench"));
+
+            if (bBenchBuildable || bBenchComponent)
+            {
+                AddCandidate(C);
+            }
+        }
+
+        for (UClass* C : OutClasses)
+        {
+            WT_LOGF(TEXT("[shard] craft bench producer candidate: %s"), *C->GetPathName());
+        }
+        if (OutClasses.Num() == 0)
+        {
+            WT_WARNF(TEXT("[shard] no craft bench producer class resolved -- recipe3 keeps soft paths only."));
+        }
     }
 
     /**
@@ -987,6 +1137,93 @@ void UWTUpgradePowerShardSynthRecipe::ApplyIngredients()
 }
 
 // ----------------------------------------------------------------------------
+// ★1.0.7 强化能量碎片 · ③ 制作台（手工台）配方 —— 用户 2026-10-26 定案新增。
+//   2 × 原版能量碎片 → 1 × 强化碎片，手搓 6s（与构造机同比例、同耗时；区别只是不用建机器）。
+//   材料表**不镜像**任何原版配方：只需要解析到原版碎片类（WT_FindVanillaShardClass）。
+//   mProducedIn 挂两个制作台类（独立制作台 / 枢纽内置制作台），任一解析成功即可用。
+// ----------------------------------------------------------------------------
+UWTUpgradePowerShardBenchRecipe::UWTUpgradePowerShardBenchRecipe()
+{
+    mManufactoringDuration = 6.0f;
+    // ★1.0.7 手搓倍率显式设 1.0：手搓时间 = mManufactoringDuration × mManualManufacturingMultiplier
+    //   （FGRecipe.h:130）。基类 CDO 的这个默认值在 SML 里读不到实现（Private 是空桩），
+    //   若它是 0 就会「一点即成」——碎片变成无限刷，经济性直接崩。这里钉死 1.0 = 手搓 6 秒。
+    mManualManufacturingMultiplier = 1.0f;
+    // 菜单顺序靠前（负值更靠前，FGRecipe.h:166 注释）。
+    mManufacturingMenuPriority = -10.0f;
+    mProduct.Add(FItemAmount(UWTUpgradePowerShardDescriptor::StaticClass(), 1));
+
+    // 软路径兜底（**只写两条建筑类**）。
+    // 权威来源 = RegisterUpgradeRecipes 里对 ApplyProducedIn(WT_FindCraftBenchProducers(...)) 的显式调用。
+    //
+    // ★1.0.7w 删掉原第 3/4 条 `Desc_WorkBench_C` / `Desc_WorkBenchIntegrated_C`：
+    //   它们是 UFGItemDescriptor 子类，**不实现 IFGRecipeProducerInterface**，而
+    //   `mProducedIn` 声明带 `Meta=(MustImplement="FGRecipeProducerInterface")`（FGRecipe.h:181）。
+    //   原版物品 tooltip 遍历产物的 mProducedIn 时直接 Execute_ 取产出图标 ⇒ 这类"软路径"
+    //   一旦被解析就必崩（2026-10-27 10:52 实测崩溃）。既然非法，就不能留在兜底里。
+    mProducedIn.Add(TSoftClassPtr<UObject>(FSoftObjectPath(TEXT(
+        "/Game/FactoryGame/Buildable/Factory/WorkBench/Build_WorkBench.Build_WorkBench_C"))));
+    mProducedIn.Add(TSoftClassPtr<UObject>(FSoftObjectPath(TEXT(
+        "/Game/FactoryGame/Buildable/Factory/WorkBench/Build_WorkBenchIntegrated.Build_WorkBenchIntegrated_C"))));
+}
+
+void UWTUpgradePowerShardBenchRecipe::ApplyProducedIn(const TArray<UClass*>& ProducerClasses)
+{
+    // ★1.0.7w 最后一道门：这里再过滤一次接口实现，不依赖调用方（WT_FindCraftBenchProducers）
+    //   已经筛过。理由见该函数里的长注释 —— 非法类写进 mProducedIn 会让原版 tooltip
+    //   在 `Execute_GetRecipeProducerItemDescriptor` 里 Assert 崩游戏，属于"必须双保险"的坑。
+    TArray<TSoftClassPtr<UObject>> Resolved;
+    for (UClass* C : ProducerClasses)
+    {
+        if (!C)
+        {
+            continue;
+        }
+        if (!C->ImplementsInterface(UFGRecipeProducerInterface::StaticClass()))
+        {
+            WT_ERRF(TEXT("[shard] recipe3: DROPPED producer %s (no IFGRecipeProducerInterface) "
+                         "-- writing it would crash the vanilla tooltip."), *C->GetPathName());
+            continue;
+        }
+        Resolved.Add(TSoftClassPtr<UObject>(C));
+    }
+
+    if (Resolved.Num() == 0)
+    {
+        // ★纪律（同 FillProducedIn）：解析失败时**保留**构造函数里的两条软路径，不清空 ——
+        // 清空 mProducedIn = 配方不属于任何机器，玩家在制作台里永远看不到，而且不报错。
+        WT_WARNF(TEXT("[shard] bench class unresolved -- recipe3 keeps the two soft paths only."));
+        return;
+    }
+
+    mProducedIn = MoveTemp(Resolved);
+    WT_LOGF(TEXT("[shard] recipe3 producer set: %d bench class(es)."), mProducedIn.Num());
+}
+
+void UWTUpgradePowerShardBenchRecipe::ApplyIngredients()
+{
+    if (UClass* VanillaShard = WT_FindVanillaShardClass())
+    {
+        mIngredients.Empty();
+        mIngredients.Add(FItemAmount(TSubclassOf<UFGItemDescriptor>(VanillaShard), 2));   // 原版碎片 ×2
+        mManufactoringDuration = 6.0f;
+        mManualManufacturingMultiplier = 1.0f;   // 手搓 6 秒（见构造函数注释）
+        mProduct.Empty();
+        mProduct.Add(FItemAmount(UWTUpgradePowerShardDescriptor::StaticClass(), 1));
+        WT_LOGF(TEXT("[shard] recipe3 (craft bench): 2 x %s -> 1 enhanced shard."),
+                *VanillaShard->GetName());
+    }
+    else
+    {
+        // 原版碎片类解析不到 ⇒ 停用整条配方（绝不能留下「零材料无限产出」的配方）。
+        mIngredients.Empty();
+        mProduct.Empty();
+        mProducedIn.Empty();
+        WT_WARNF(TEXT("[shard] recipe3 DISABLED: vanilla shard class unresolved."));
+    }
+}
+
+// ----------------------------------------------------------------------------
 // ★0.2.36h（用户定案「它可以被回收」）：回收点数 = 原版能量碎片 ×2。
 // 原版数值在运行时从原版碎片配方 1 的**产物描述符** CDO 读（反射读 —— mResourceSinkPoints 是
 // 基类保护成员，对本类之外的 CDO 只能走反射）；原版改数值我们自动跟随。读不到兜底 150000。
@@ -1079,13 +1316,13 @@ void UWTShopPowerShardSchematic::ApplyShopSchematicData()
 
     bool bConfigured = true;
 
-    // 售价：50,000 代价券。
+    // 售价：25,000 代价券（★1.0.7 用户 2026-10-26 定案，原 50,000 半价）。
     if (UClass* Coupon = StaticLoadClass(UFGItemDescriptor::StaticClass(), nullptr,
             TEXT("/Game/FactoryGame/Resource/Parts/ResourceSinkCoupon/Desc_ResourceSinkCoupon.Desc_ResourceSinkCoupon_C")))
     {
         Coupon->AddToRoot();   // 0.2.7 台账：裸 UClass* 不是 GC 引用
         mCost.Empty();
-        mCost.Add(FItemAmount(TSubclassOf<UFGItemDescriptor>(Coupon), 50000));
+        mCost.Add(FItemAmount(TSubclassOf<UFGItemDescriptor>(Coupon), 25000));
     }
     else
     {
@@ -1456,9 +1693,11 @@ static void WT_ApplyUpgradeItemIcons()
     const FWTPair Specs[] = {
         { UWTUpgradeStorageDescriptor::StaticClass(),              GIconCentralStorage,        TEXT("UWTUpgradeStorageDescriptor") },
         { UWTUpgradeCloudDownloaderDescriptor::StaticClass(),      GIconCentralStorage,        TEXT("UWTUpgradeCloudDownloaderDescriptor") },
+        { UWTUpgradePowerStorageDescriptor::StaticClass(),         GIconPowerStorage,          TEXT("UWTUpgradePowerStorageDescriptor") },
+        // ★1.0.8AU 补上两座云端流体站描述符（上传/下载）：它们与另三座站同款 SM_CentralStorage_01 模型，
+        //   故同样借位面存储站官方图标。此前漏加 ⇒ 建造枪 / HUB 里程碑 / MAM 奖励里这两座站图标整块空白。
         { UWTUpgradeCloudFluidUploaderDescriptor::StaticClass(),   GIconCentralStorage,        TEXT("UWTUpgradeCloudFluidUploaderDescriptor") },
         { UWTUpgradeCloudFluidDownloaderDescriptor::StaticClass(), GIconCentralStorage,        TEXT("UWTUpgradeCloudFluidDownloaderDescriptor") },
-        { UWTUpgradePowerStorageDescriptor::StaticClass(),         GIconPowerStorage,          TEXT("UWTUpgradePowerStorageDescriptor") },
         // 产能加速器 = 退役兼容类，但老存档的研究奖励/商店仍可能引用它的图标 —— 一并挂上，防止白块。
         { UWTUpgradeAcceleratorDescriptor::StaticClass(),          GIconCentralStorage,        TEXT("UWTUpgradeAcceleratorDescriptor") },
     };
@@ -1522,6 +1761,127 @@ static UTexture2D* WT_LoadStyleIcon(EWTSchematicIconStyle Style, const FWTSchema
     return Chosen;
 }
 
+// ★★★2026-11-07 #45「图标太小」：用户定调「看原版大小，在等比例放置」。
+//   本函数只读地取一座**原版**研究树首节点的 schematic 的 `mSchematicIcon.ImageSize` 作为基准，
+//   把我们的 brush 对齐到它（MAM 节点 widget 直接画 schematic 的 mSchematicIcon brush，见
+//   Remote_FactoryResearchTree.cpp:1350 的渲染链路，故 ImageSize 直接决定节点里图标画多大）。
+//
+//   只探测、不修改；带重试与缓存：成功一次即缓存，失败最多重试 6 次后放弃并回退原生尺寸。
+//   读取方式与下方 WT_ApplySchematicIconStyled 写 brush 同一套反射，绝不猜字段类型。
+static FVector2D GWT_VanillaMAMIconSize(-1.f, -1.f);
+static int32    GWT_VanillaMAMIconAttempts = 0;
+
+// 从某个持有 FSlateBrush 的对象上读出其 ImageSize（FVector2D）。
+// 形参必须是 FStructProperty*：只有 FStructProperty 才有 ->Struct（指向它描述的 UScriptStruct），
+// 基类 FProperty 没有该成员（这是上一轮编译 C2039 的真凶）。
+static FVector2D WT_ReadBrushImageSize(UObject* Owner, FStructProperty* BrushStructProp)
+{
+    FVector2D V(0.f, 0.f);
+    if (!Owner || !BrushStructProp)
+    {
+        return V;
+    }
+    void* SB = BrushStructProp->ContainerPtrToValuePtr<void>(Owner);
+    if (FProperty* ISP = BrushStructProp->Struct->FindPropertyByName(TEXT("ImageSize")))
+    {
+        if (FStructProperty* VecProp = CastField<FStructProperty>(ISP))
+        {
+            void* VecMem = VecProp->ContainerPtrToValuePtr<void>(SB);
+            if (FProperty* Xp = VecProp->Struct->FindPropertyByName(TEXT("X")))
+            {
+                if (FNumericProperty* Xn = CastField<FNumericProperty>(Xp))
+                {
+                    V.X = Xn->GetFloatingPointPropertyValue(Xn->ContainerPtrToValuePtr<void>(VecMem));
+                }
+            }
+            if (FProperty* Yp = VecProp->Struct->FindPropertyByName(TEXT("Y")))
+            {
+                if (FNumericProperty* Yn = CastField<FNumericProperty>(Yp))
+                {
+                    V.Y = Yn->GetFloatingPointPropertyValue(Yn->ContainerPtrToValuePtr<void>(VecMem));
+                }
+            }
+        }
+    }
+    return V;
+}
+
+static FVector2D WT_GetVanillaMAMIconSize()
+{
+    // 命中一次就缓存返回；没命中允许重试，但限 6 次避免反复 LoadClass 刷屏。
+    if (GWT_VanillaMAMIconSize.X > 1.f && GWT_VanillaMAMIconSize.Y > 1.f)
+    {
+        return GWT_VanillaMAMIconSize;
+    }
+    if (GWT_VanillaMAMIconAttempts >= 6)
+    {
+        return GWT_VanillaMAMIconSize;
+    }
+    ++GWT_VanillaMAMIconAttempts;
+
+    // 与 WT_AcquireLinkTemplate（Remote_FactoryResearchTree.cpp:312）同源的原版研究树路径。
+    static const TCHAR* kVanillaTreePaths[] = {
+        TEXT("/Game/FactoryGame/Schematics/Research/BPD_ResearchTree_Quartz.BPD_ResearchTree_Quartz_C"),
+        TEXT("/Game/FactoryGame/Schematics/Research/BPD_ResearchTree_Caterium.BPD_ResearchTree_Caterium_C"),
+        TEXT("/Game/FactoryGame/Schematics/Research/BPD_ResearchTree_PowerSlugs.BPD_ResearchTree_PowerSlugs_C"),
+        TEXT("/Game/FactoryGame/Schematics/Research/BPD_ResearchTree_Sulfur.BPD_ResearchTree_Sulfur_C"),
+        TEXT("/Game/FactoryGame/Schematics/Research/BPD_ResearchTree_Nutrients.BPD_ResearchTree_Nutrients_C"),
+        TEXT("/Game/FactoryGame/Schematics/Research/BPD_ResearchTree_Mycelia.BPD_ResearchTree_Mycelia_C"),
+        TEXT("/Game/FactoryGame/Schematics/Research/BPD_ResearchTree_AlienOrganisms.BPD_ResearchTree_AlienOrganisms_C"),
+        TEXT("/Game/FactoryGame/Schematics/Research/BPD_ResearchTree_AlienTech.BPD_ResearchTree_AlienTech_C"),
+        TEXT("/Game/FactoryGame/Schematics/Research/BPD_ResearchTree_HardDrive.BPD_ResearchTree_HardDrive_C"),
+        TEXT("/Game/FactoryGame/Schematics/Research/BPD_ResearchTree_XMas.BPD_ResearchTree_XMas_C"),
+    };
+
+    for (const TCHAR* Path : kVanillaTreePaths)
+    {
+        UClass* TreeCls = LoadClass<UFGResearchTree>(nullptr, Path);
+        if (!TreeCls)
+        {
+            continue;
+        }
+        TArray<UFGResearchTreeNode*> Nodes = UFGResearchTree::GetNodes(TreeCls);
+        for (UFGResearchTreeNode* N : Nodes)
+        {
+            if (!N)
+            {
+                continue;
+            }
+            // GetNodeSchematic() 返回 TSubclassOf<UFGSchematic>（声明见 FGResearchTreeNode.h:21）；
+            // 图标存在该 schematic 的 CDO 的 mSchematicIcon 里（FGSchematic.h:255）。
+            TSubclassOf<UFGSchematic> SchCls = N->GetNodeSchematic();
+            UClass* SC = SchCls.Get();
+            if (!SC)
+            {
+                continue;
+            }
+            UFGSchematic* SchCDO = Cast<UFGSchematic>(SC->GetDefaultObject());
+            if (!SchCDO)
+            {
+                continue;
+            }
+            if (FStructProperty* SP = CastField<FStructProperty>(
+                    UFGSchematic::StaticClass()->FindPropertyByName(TEXT("mSchematicIcon"))))
+            {
+                if (SP->Struct && SP->Struct->GetName().Equals(TEXT("SlateBrush"), ESearchCase::IgnoreCase))
+                {
+                    const FVector2D V = WT_ReadBrushImageSize(SchCDO, SP);
+                    if (V.X > 1.f && V.Y > 1.f)
+                    {
+                        GWT_VanillaMAMIconSize = V;
+                        WT_WARNF(TEXT("[icon] vanilla MAM baseline mSchematicIcon.ImageSize=(%.0f,%.0f) from node '%s'"),
+                                 V.X, V.Y, *N->GetName());
+                        return GWT_VanillaMAMIconSize;
+                    }
+                }
+            }
+        }
+    }
+    WT_WARNF(TEXT("[icon] vanilla MAM baseline not available yet (attempt %d/6); will retry on next node."),
+             GWT_VanillaMAMIconAttempts);
+    return GWT_VanillaMAMIconSize; // (-1,-1)
+}
+
 void WT_ApplySchematicIconStyled(UFGSchematic* Schematic, EWTSchematicIconStyle Style)
 {
     if (!Schematic)
@@ -1563,13 +1923,79 @@ void WT_ApplySchematicIconStyled(UFGSchematic* Schematic, EWTSchematicIconStyle 
             {
                 RO->SetObjectPropertyValue(RO->ContainerPtrToValuePtr<void>(B), Icon);
             }
+
+            // ★★★2026-11-05 「MAM 节点方块里是空白色块」的**真正根因**（用户截图实锤 + 引擎源码核实）
+            //   FSlateBrush 从零 InitializeStruct 出来时 `ImageType` = **NoImage(0)**。
+            //   只设 ResourceObject **不会**把它升级成 FullColor —— 引擎
+            //   `FSlateBrush::SetResourceObject()`（SlateBrush.cpp:192-204）只改指针；
+            //   只有**从资产加载**的 brush 才会在 PostLoad 里被补成 FullColor。
+            //   ⇒ Slate 拿着 ImageType=NoImage 的 brush 走「纯色块」绘制路径，
+            //     在 MAM 节点里就渲染成一个没有任何内容的灰方块（截图 14 个方块全空）。
+            //   一手核实枚举（SlateBrush.h:90-108）：
+            //     namespace ESlateBrushImageType { enum Type : int { NoImage=0, FullColor, Linear, Vector }; }
+            //   存储字段（同文件 :264）：TEnumAsByte<enum ESlateBrushImageType::Type> ImageType;
+            //   ★TEnumAsByte 反射出来是 FByteProperty ⇒ ImportText 认短名 "FullColor"，兜底写数字 1。
+            if (FProperty* IT = S->FindPropertyByName(TEXT("ImageType")))
+            {
+                void* ITMem = IT->ContainerPtrToValuePtr<void>(B);
+                bool bTypeSet = false;
+                static const TCHAR* const ImageTypeTexts[] = {
+                    TEXT("FullColor"), TEXT("ESlateBrushImageType::FullColor"), TEXT("1") };
+                for (const TCHAR* T : ImageTypeTexts)
+                {
+                    if (IT->ImportText_Direct(T, ITMem, nullptr, 0, nullptr))
+                    {
+                        bTypeSet = true;
+                        break;
+                    }
+                }
+                if (!bTypeSet)
+                {
+                    // 最后兜底：按数值属性直接写 1（TEnumAsByte 的存储是 1 字节，数值语义等价）。
+                    if (FNumericProperty* Num = CastField<FNumericProperty>(IT))
+                    {
+                        // ★必须显式 (int64)：SetIntPropertyValue 有 int64 / uint64 两个重载，
+                        //   裸写字面量 1 会在两者之间二义（已在 2026-11-05 编译实测撞到）。
+                        Num->SetIntPropertyValue(ITMem, static_cast<int64>(1));
+                        bTypeSet = true;
+                    }
+                }
+                if (!bTypeSet)
+                {
+                    WT_WARNF(TEXT("[icon] brush ImageType could not be set to FullColor on %s -- "
+                                  "MAM nodes will render as blank colour blocks."), *C->GetName());
+                }
+            }
+            else
+            {
+                WT_WARNF(TEXT("[icon] brush has no ImageType field on %s -- "
+                              "MAM nodes may render as blank colour blocks."), *C->GetName());
+            }
             if (FProperty* IS = S->FindPropertyByName(TEXT("ImageSize")))
             {
-                const FString SizeText = FString::Printf(TEXT("(X=%d,Y=%d)"), Icon->GetSizeX(), Icon->GetSizeY());
+                // ★★★2026-11-07 #45「图标太小」：尺寸对齐原版 MAM 节点图标基准
+                //   （用户定调「看原版大小，在等比例放置」）。优先用原版首节点 schematic 的
+                //   mSchematicIcon.ImageSize 作基准；拿不到才回退原生贴图尺寸（既有行为）。
+                float SzX = static_cast<float>(Icon->GetSizeX());
+                float SzY = static_cast<float>(Icon->GetSizeY());
+                const FVector2D VanillaSize = WT_GetVanillaMAMIconSize();
+                const bool bUsedVanilla = (VanillaSize.X > 1.f && VanillaSize.Y > 1.f);
+                if (bUsedVanilla)
+                {
+                    SzX = VanillaSize.X;
+                    SzY = VanillaSize.Y;
+                }
+                const FString SizeText = FString::Printf(TEXT("(X=%.0f,Y=%.0f)"), SzX, SzY);
                 if (!IS->ImportText_Direct(*SizeText, IS->ContainerPtrToValuePtr<void>(B), nullptr, 0, nullptr))
                 {
                     WT_WARNF(TEXT("[icon] brush ImageSize=%s rejected by %s."),
                              *SizeText, *IS->GetClass()->GetName());
+                }
+                else
+                {
+                    WT_WARNF(TEXT("[icon] %s.mSchematicIcon ImageSize set (%.0f,%.0f)%s."),
+                             *C->GetName(), SzX, SzY,
+                             bUsedVanilla ? TEXT(" [vanilla baseline]") : TEXT(" [native fallback]"));
                 }
             }
             // DrawAs 必须是 Image，否则默认刷子什么都不画。短名与全名各试一次。
@@ -1639,6 +2065,32 @@ void WT_ApplySchematicIconStyled(UFGSchematic* Schematic, EWTSchematicIconStyle 
                 }
             }
 
+            // ★★★2026-11-05 最后一块拼图：**UVRegion** —— 「画出来是纯色块」的真凶
+            //
+            // 一手证据（引擎 `SlateCore/Private/Styling/SlateBrush.cpp:10-28`，默认构造函数）：
+            //     : TintColor(White)
+            //     , DrawAs(ESlateBrushDrawType::Image)
+            //     , Tiling(NoTile)
+            //     , Mirroring(NoMirror)
+            //     , ImageType(ESlateBrushImageType::NoImage)
+            //     , ImageSize(32, 32)
+            //     , ResourceObject(nullptr)
+            //     , UVRegion(ForceInit)      // ← Min=(0,0) Max=(0,0)，而且 bIsValid=**true**
+            //
+            // `UVRegion(ForceInit)` = `FBox2f(EForceInit)` ⇒ Min=Max=(0,0) 但**标记为有效**。
+            // Slate 绘制时见到「有效」就直接采信 ⇒ UV 范围是**零尺寸** ⇒ 整块只采到同一个像素
+            // ⇒ 输出一块**纯色**（用户截图那 14 个灰方块就是这么来的）。
+            // 从资产加载的 brush 会在 PostLoad 里被补成 (0,0)-(1,1)，凭空 NewObject 的不会。
+            //
+            // 类型链路（一手核实 `SlateBrush.h`）：
+            //   · 字段本体 `:487 FBox2f UVRegion;` 是 **protected**（不能直接点）；
+            //   · 但类里给了 public setter `:393 void SetUVRegion(const FBox2f&)` —— 用它。
+            //   （`FDeprecateBox2D` 那层只出现在 getter 的返回类型上，赋值走 FBox2f 重载即可。）
+            {
+                FSlateBrush* Brush = static_cast<FSlateBrush*>(B);
+                Brush->SetUVRegion(FBox2f(FVector2f(0.f, 0.f), FVector2f(1.f, 1.f)));
+            }
+
             SP->CopyCompleteValue(SP->ContainerPtrToValuePtr<void>(Schematic), B);
             S->DestroyStruct(B);
             WT_WARNF(TEXT("[icon] %s.mSchematicIcon <= brush(%s) OK"), *C->GetName(), *Icon->GetName());
@@ -1688,7 +2140,13 @@ void WT_ApplySchematicIconStyled(UFGSchematic* Schematic, EWTSchematicIconStyle 
             {
                 if (TintProp->Struct)
                 {
-                    void* TintMem = BrushProp->ContainerPtrToValuePtr<void>(Schematic);
+                    // ★★★2026-11-05 修：基址必须是**刷子结构体的地址**，不是 UObject 地址。
+                    //   TintColor 是 mSchematicIcon(FSlateBrush) 的**子属性**，所以它的容器是
+                    //   BrushMem（上面 1901 行算好的那个），偏移才落到 TintColor 上。
+                    //   旧写法传 Schematic（UObject 基址）⇒ 偏移算到了对象内存的无关位置
+                    //   ⇒ 日志一直打 `tint=(R=-3.38e+31,...) rule=`，染色到底有没有生效永远看不出来。
+                    //   （实测值 -3.3846e31 在所有条目里完全相同，就是同一个错误地址的稳定垃圾值。）
+                    void* TintMem = TintProp->ContainerPtrToValuePtr<void>(BrushMem);
                     FString ColorText, RuleText;
                     if (FProperty* SC = TintProp->Struct->FindPropertyByName(TEXT("SpecifiedColor")))
                     {
@@ -1701,8 +2159,38 @@ void WT_ApplySchematicIconStyled(UFGSchematic* Schematic, EWTSchematicIconStyle 
                     TintText = FString::Printf(TEXT("%s rule=%s"), *ColorText, *RuleText);
                 }
             }
-            WT_WARNF(TEXT("[icon-verify] %s.mSchematicIcon readback: resource=%s drawAs=%s tint=%s"),
-                     *C->GetName(), ResObj ? *ResObj->GetName() : TEXT("NULL"), *DrawAsText, *TintText);
+            // ★2026-11-05 加 ImageType 回读：这是 MAM 节点「空白色块」的判定位。
+            //   期望读回 FullColor。若读回 NoImage，节点必然画成纯色块。
+            // ★★2026-11-05 二次修正：`ExportText_InContainer` 是**追加**语义，不是覆盖。
+            //   上一版把初始值写成 "<no ImageType field>" 再让它追加 ⇒ 实测打出了
+            //   `imageType=<no ImageType field>FullColor` 这种既像"没字段"又像"有值"的鬼话，
+            //   违反「判据本身也要自证」。现在改成：**先导出到空串，导出后按结果分派**。
+            FString ImageTypeText;
+            if (FProperty* ITP = BrushProp->Struct->FindPropertyByName(TEXT("ImageType")))
+            {
+                ITP->ExportText_InContainer(0, ImageTypeText, BrushMem, nullptr, nullptr, PPF_None, nullptr);
+                if (ImageTypeText.IsEmpty())
+                {
+                    // TEnumAsByte 的 ExportText 有时给空串 ⇒ 退回按数值读，保证日志一定有可判读的值。
+                    if (FNumericProperty* Num = CastField<FNumericProperty>(ITP))
+                    {
+                        const int64 V = Num->GetSignedIntPropertyValue(ITP->ContainerPtrToValuePtr<void>(BrushMem));
+                        ImageTypeText = FString::Printf(TEXT("<numeric %lld, 0=NoImage 1=FullColor>"), V);
+                    }
+                    else
+                    {
+                        ImageTypeText = TEXT("<empty export, not numeric>");
+                    }
+                }
+            }
+            else
+            {
+                ImageTypeText = TEXT("<NO ImageType FIELD>");
+            }
+
+            WT_WARNF(TEXT("[icon-verify] %s.mSchematicIcon readback: resource=%s drawAs=%s imageType=%s tint=%s"),
+                     *C->GetName(), ResObj ? *ResObj->GetName() : TEXT("NULL"), *DrawAsText,
+                     *ImageTypeText, *TintText);
         }
     }
 }
@@ -1866,14 +2354,121 @@ FString UWTUpgradeAcceleratorMilestone::InstallCostAndUnlock()
     return InstallCostCategoryAndUnlock(Costs, Recipes);
 }
 
+// ---- T9：强化能量碎片（★2026-11-05 用户定案：从 T5 改档到 T9）----
+// 成本：沿用同一组太空电梯件（多功能框架 T3 / 自动化线缆 T4 / 模块化引擎 T6），但**数量抬到 T9 档**
+//   —— 原 T5 档是 25/50/25，现在统一搭上 T9 的量级增长（×2）。件名一个都没换，避免引入未核实的路径。
+static const FWTCostLine GMilestoneCostPowerShard[] =
+{
+    { TEXT("/Game/FactoryGame/Resource/Parts/SpaceElevatorParts/Desc_SpaceElevatorPart_2.Desc_SpaceElevatorPart_2_C"), 50 },  // T3 多功能框架
+    { TEXT("/Game/FactoryGame/Resource/Parts/SpaceElevatorParts/Desc_SpaceElevatorPart_3.Desc_SpaceElevatorPart_3_C"), 100 }, // T4 自动化线缆
+    { TEXT("/Game/FactoryGame/Resource/Parts/SpaceElevatorParts/Desc_SpaceElevatorPart_4.Desc_SpaceElevatorPart_4_C"), 50 },  // T6 模块化引擎
+};
+
+// ---- T5：云端固体（★2026-11-05 新增卡）----
+// 造价思路：T5 玩家手上必有钢板/钢管/多功能框架，另加 T4 自动化线缆体现「比 T3 蓄电池卡贵一档」。
+static const FWTCostLine GMilestoneCostCloudSolid[] =
+{
+    { TEXT("/Game/FactoryGame/Resource/Parts/SteelPlate/Desc_SteelPlate.Desc_SteelPlate_C"), 100 },                            // T3 钢板
+    { TEXT("/Game/FactoryGame/Resource/Parts/SpaceElevatorParts/Desc_SpaceElevatorPart_2.Desc_SpaceElevatorPart_2_C"), 50 },    // T3 多功能框架
+    { TEXT("/Game/FactoryGame/Resource/Parts/SpaceElevatorParts/Desc_SpaceElevatorPart_3.Desc_SpaceElevatorPart_3_C"), 25 },    // T4 自动化线缆
+};
+
+// ---- T7：云端液体（★2026-11-05 新增卡）----
+// 造价思路：与 T5 卡同构，主料换成 T4 自动化线缆 + T6 模块化引擎（T7 与 T6 同阶段开放）。
+static const FWTCostLine GMilestoneCostCloudFluid[] =
+{
+    { TEXT("/Game/FactoryGame/Resource/Parts/SpaceElevatorParts/Desc_SpaceElevatorPart_3.Desc_SpaceElevatorPart_3_C"), 50 },   // T4 自动化线缆
+    { TEXT("/Game/FactoryGame/Resource/Parts/SpaceElevatorParts/Desc_SpaceElevatorPart_4.Desc_SpaceElevatorPart_4_C"), 25 },   // T6 模块化引擎
+    { TEXT("/Game/FactoryGame/Resource/Parts/SteelPipe/Desc_SteelPipe.Desc_SteelPipe_C"), 60 },                                 // T3 钢管
+};
+
+UWTUpgradePowerShardMilestone::UWTUpgradePowerShardMilestone()
+{
+    // ★2026-11-05 用户定案：「强化能量碎片放到 T9」。原为 T5（1.0.7 首版），现改到 T9。
+    mTechTier = 9;
+    mMenuPriority = 10.0f;    // 同档组内排前面
+    mTimeToComplete = 60.0f;
+    mDisplayName = WT_LOCTEXT("Milestone_UpgradePowerShard", "智能工厂 · 强化能量碎片");
+    mDescription = WT_LOCTEXT("MilestoneDesc_UpgradePowerShard",
+        "解锁强化能量碎片的三种制造方式：构造机（2 块能量碎片 → 1 块）、量子编码器（合成能量碎片"
+        "的全部材料翻倍 → 1 块）、制作台（2 块能量碎片手搓 1 块，6 秒）。强化碎片插进机器碎片槽后"
+        "每块 +100% 超频，机器上限 500%（受槽位数限制，1 块 200% / 2 块 300% / 3 块 400% / 4 块 500%），"
+        "耗电按原版越级曲线自动上涨。");
+}
+
+FString UWTUpgradePowerShardMilestone::InstallCostAndUnlock()
+{
+    TArray<FItemAmount> Costs;
+    FillIngredients(Costs, GMilestoneCostPowerShard, UE_ARRAY_COUNT(GMilestoneCostPowerShard),
+                    TEXT("power shard milestone"));
+
+    // 三条配方一起发：少发一条 = 新档买了卡却在某台机器里看不到配方（0.2.57 的编码器事故）。
+    TArray<UClass*> Recipes;
+    Recipes.Add(UWTUpgradePowerShardRecipe::StaticClass());        // ① 构造机
+    Recipes.Add(UWTUpgradePowerShardSynthRecipe::StaticClass());   // ② 量子编码器
+    Recipes.Add(UWTUpgradePowerShardBenchRecipe::StaticClass());   // ③ 制作台（★1.0.7 新增）
+    return InstallCostCategoryAndUnlock(Costs, Recipes);
+}
+
+// ---- T5：云端固体（上传站 + 下载站）★2026-11-05 新增 ----
+UWTUpgradeCloudSolidMilestone::UWTUpgradeCloudSolidMilestone()
+{
+    mTechTier = 5;
+    mMenuPriority = 5.0f;
+    mTimeToComplete = 60.0f;
+    mDisplayName = WT_LOCTEXT("Milestone_CloudSolid", "智能工厂 · 云端储存（固体）");
+    mDescription = WT_LOCTEXT("MilestoneDesc_CloudSolid",
+        "解锁云端储存上传站与云端储存下载站：把固体物品上传进位面存储的云端池，"
+        "或在任意一台下载站按需取回。两台站都要接电，上传/下载速率与云端可囤积的组数由"
+        "MAM「智能工厂」研究树的容量轨决定。");
+}
+
+FString UWTUpgradeCloudSolidMilestone::InstallCostAndUnlock()
+{
+    TArray<FItemAmount> Costs;
+    FillIngredients(Costs, GMilestoneCostCloudSolid, UE_ARRAY_COUNT(GMilestoneCostCloudSolid),
+                    TEXT("cloud solid milestone"));
+
+    TArray<UClass*> Recipes;
+    Recipes.Add(UWTUpgradeStorageRecipe::StaticClass());         // ① 云端储存上传站（固体）
+    Recipes.Add(UWTUpgradeCloudDownloaderRecipe::StaticClass()); // ② 云端储存下载站（固体）
+    return InstallCostCategoryAndUnlock(Costs, Recipes);
+}
+
+// ---- T7：云端液体（流体上传 + 流体下载）★2026-11-05 新增 ----
+UWTUpgradeCloudFluidMilestone::UWTUpgradeCloudFluidMilestone()
+{
+    mTechTier = 7;
+    mMenuPriority = 5.0f;
+    mTimeToComplete = 60.0f;
+    mDisplayName = WT_LOCTEXT("Milestone_CloudFluid", "智能工厂 · 云端储存（液体）");
+    mDescription = WT_LOCTEXT("MilestoneDesc_CloudFluid",
+        "解锁云端流体上传站与云端流体下载站：液体同样能上传进位面存储并在别处取回。"
+        "两台站都按原版管道流量结算，接上管道即可工作。");
+}
+
+FString UWTUpgradeCloudFluidMilestone::InstallCostAndUnlock()
+{
+    TArray<FItemAmount> Costs;
+    FillIngredients(Costs, GMilestoneCostCloudFluid, UE_ARRAY_COUNT(GMilestoneCostCloudFluid),
+                    TEXT("cloud fluid milestone"));
+
+    TArray<UClass*> Recipes;
+    Recipes.Add(UWTUpgradeCloudFluidUploaderRecipe::StaticClass());   // ③ 云端流体上传站
+    Recipes.Add(UWTUpgradeCloudFluidDownloaderRecipe::StaticClass()); // ④ 云端流体下载站
+    return InstallCostCategoryAndUnlock(Costs, Recipes);
+}
+
 // ----------------------------------------------------------------------------
 // ★0.2.36 新版插槽系统（用户定案 10-07）
 //
 // 产能研究阶段 s（1~4）原本分别抬两处，自 2026-10-17 起用户定案改为**全阶段统一**：
 //   * 强化碎片每块潜能增量：恒 1.0（+100%/片）
-//   * 全场可超频机器（原版 CDO mMaxPotential==2.5）的潜能上限：恒 4.0（400%）
-// ⇒ 1/2/3 片强化碎片 = 200/300/400%；原版碎片每块 +0.5、3 槽物理极限 250%，互不干扰。
-// 耗电走原版指数曲线（潜能^指数）自动放大，越往上电费越狠 —— 原版自平衡。
+//   * 全场可超频机器（原版 CDO mMaxPotential==2.5）的潜能上限：★1.0.7 起恒 5.0（500%，原 4.0）
+// ★1.0.7（用户 2026-10-26 定案）：增量维持 +100%/片，潜能上限 400% → **500%**
+//   ⇒ 1/2/3/4 片强化碎片 = 200/300/400/500%；第 4 片终于有意义（此前 3 片就顶满 400%）。
+//   原版碎片每块 +0.5、3 槽物理极限 250%，与本上限互不干扰（本上限只抬 mod 碎片可用的天花板）。
+//   耗电走原版指数曲线（潜能^指数）自动放大，越往上电费越狠 —— 原版自平衡。
 // ----------------------------------------------------------------------------
 
 namespace
@@ -1884,15 +2479,15 @@ namespace
         float Cap;   // 机器潜能上限
     };
 
-    // 下标 = 阶段（0 弃用）。2/3、5/6 使各阶段「3 块正好顶满新上限」。
-    // ★用户定案（2026-10-17）：每片强化碎片 = +100% 超频，3 片顶满 400%；不再随研究阶段缩放。
-    // Inc = 每片潜能增量（1.0 = +100%），Cap = 机器潜能上限（4.0 = 400%）。1/2/3 片 → 200/300/400%。
+    // ★1.0.7（用户 2026-10-26 定案）：每片强化碎片仍是 +100%，但上限 400% → 500%，
+    //   使「第 4 片」终于有收益（旧表 3 片就顶满）。四档统一，不随研究阶段缩放。
+    // Inc = 每片潜能增量（1.0 = +100%），Cap = 机器潜能上限（5.0 = 500%）。1/2/3/4 片 → 200/300/400/500%。
     const FWTPotStage GPotStages[5] = {
         { 0.f,      0.f   },
-        { 1.0f,     4.0f  },
-        { 1.0f,     4.0f  },
-        { 1.0f,     4.0f  },
-        { 1.0f,     4.0f  },
+        { 1.0f,     5.0f  },
+        { 1.0f,     5.0f  },
+        { 1.0f,     5.0f  },
+        { 1.0f,     5.0f  },
     };
 
     int32 GAppliedPotStage = 0;   // 0 = 尚未应用
@@ -2137,13 +2732,24 @@ namespace Remote_FactoryUpgrades
             // saves but their recipes are pruned from the available list (see Retired) => cannot re-craft.
             TArray<TSubclassOf<UFGRecipe>> Live;
             Live.Add(URemote_FactoryEquipRecipe::StaticClass());
-            // ★0.2.134 闸门（WT_FEATURE_POWER_SHARD）：开=碎片两条留在 Live（不 prune）；
+            // ★0.2.134 闸门（WT_FEATURE_POWER_SHARD）：开=碎片三条留在 Live（不 prune）；
             // 关=移入下面的 Retired ⇒ 老存档里已有的碎片配方条目被 prune，机器里不再出现。
             if (WT_FEATURE_POWER_SHARD)
             {
                 Live.Add(UWTUpgradePowerShardRecipe::StaticClass());
                 Live.Add(UWTUpgradePowerShardSynthRecipe::StaticClass());
+                Live.Add(UWTUpgradePowerShardBenchRecipe::StaticClass());   // ★1.0.7 ③ 制作台
             }
+            // ★★★2026-11-05 关键改动：云端四站改为**无条件**进 Live（不再看 WT_FEATURE_CLOUD_STATIONS，
+            //   也不再看「有没有买对应里程碑卡」）。
+            //   为什么必须无条件：Live 的作用是「别把这些配方判成 Stale 摘掉」。它们现在由 T5（固体）/
+            //   T7（液体）两张卡发放，**未买卡的新档本来就没有这些条目**，多列进 Live 不会凭空发放；
+            //   但**已买过旧 T1 卡的老档**手里本来就有 —— 若按里程碑判 Live，老档一读档就被 prune，
+            //   玩家平白丢掉已经能造的建筑（0.2.48 那类事故）。⇒「发放」看里程碑，「回收」永远不看。
+            Live.Add(UWTUpgradeStorageRecipe::StaticClass());              // ① 云端储存上传站（固体）
+            Live.Add(UWTUpgradeCloudDownloaderRecipe::StaticClass());      // ② 云端储存下载站（固体）
+            Live.Add(UWTUpgradeCloudFluidUploaderRecipe::StaticClass());   // ③ 云端流体上传站
+            Live.Add(UWTUpgradeCloudFluidDownloaderRecipe::StaticClass()); // ④ 云端流体下载站
 
             // *0.2.59b: upgrade-building recipes retired too (see Live comment). Old saves lose them from
             // the available list (cannot re-craft) but keep already-placed buildings.
@@ -2154,13 +2760,17 @@ namespace Remote_FactoryUpgrades
             {
                 Retired.Add(UWTUpgradePowerShardRecipe::StaticClass());
                 Retired.Add(UWTUpgradePowerShardSynthRecipe::StaticClass());
+                Retired.Add(UWTUpgradePowerShardBenchRecipe::StaticClass());   // ★1.0.7 ③
             }
             Retired.Add(UWTUpgradePowerShardRecipe2::StaticClass());
             Retired.Add(UWTUpgradePowerShardRecipe3::StaticClass());
+            // ★1.0.7：云端站恢复发放（见上方 Live）。仍写进 Retired 是**故意**的 ——
+            // Stale 判据是 `Retired.Contains(R) && !Live.Contains(R)`：
+            //   · 固体两台（闸门开）同时在 Live ⇒ 不会被 prune；
+            //   · 云端流体两台站已于本版恢复（配方/描述符类重新加回，并登记进 Live + Wanted），
+            //     故此处不再 prune 它们；已放置的旧液体站实例建筑类仍在，不受影响。
             Retired.Add(UWTUpgradeStorageRecipe::StaticClass());
             Retired.Add(UWTUpgradeCloudDownloaderRecipe::StaticClass());
-            Retired.Add(UWTUpgradeCloudFluidUploaderRecipe::StaticClass());
-            Retired.Add(UWTUpgradeCloudFluidDownloaderRecipe::StaticClass());
             Retired.Add(UWTUpgradeAcceleratorRecipe::StaticClass());
 
             TArray<TSubclassOf<UFGRecipe>> Stale;
@@ -2198,6 +2808,9 @@ namespace Remote_FactoryUpgrades
         //   故**不再依赖里程碑门槛**——机器未解锁时本来就做不了，不会破坏前期节奏：
         //     · 装备配方（手持终端）仍按设计由 WT T1 里程碑解锁（保留 bT1Unlocked 门槛）；
         //     · 强化碎片两条配方**无条件补发**，保证「解锁 T1 / 有构造机」即能在机器里看到。
+        // ★1.0.7（2026-10-26 最终定案「算了，跟终端放一起吧」）：强化碎片不再单开 T5 卡，三条
+        //   配方回到「跟手持终端同一张卡」——门槛就是 bT1Unlocked（T1 里程碑已购，或配方已在）。
+        //   取消耗 0.2.59b 的「无条件补发」（当时是为绕开 T1 判定不稳），也取消本轮首版的 T5 门槛。
         bool bT1Unlocked = RM->IsRecipeAvailable(URemote_FactoryEquipRecipe::StaticClass());
         if (!bT1Unlocked)
         {
@@ -2212,7 +2825,9 @@ namespace Remote_FactoryUpgrades
                                    "gate re-opened via purchased WT milestone schematic."));
             }
         }
-        // 注意：此处不再因 !bT1Unlocked 直接 return —— 强化碎片配方无论门槛如何都补发（见下）。
+        // 注意：此处不再因 !bT1Unlocked 直接 return —— 每条配方在下方 Missing 循环里各按自己的门槛
+        // 判定（碎片三条 / 云端两条 = T1，超级蓄电池 = T3），一处 return 会把整批补发一起掐掉。
+        // ★旧文案「强化碎片无论门槛如何都补发」是 0.2.59b 的临时放宽，1.0.7 已取消，别再照抄。
 
         // ★1.0.11 恢复超级蓄电池：T3 存储里程碑（UWTUpgradeStorageMilestone）已重新发放该配方；
         // 此处加 T3 门槛，保证「已购 T3 的老存档」升级后也能经读档补发拿到，且不提前到 T1 解锁。
@@ -2226,24 +2841,41 @@ namespace Remote_FactoryUpgrades
             }
         }
 
+        // ★2026-11-05 三张新卡的「已购」判定。一次查清，供下面 Wanted 循环按配方分派。
+        //   T5 云端固体 / T7 云端液体 / T9 强化碎片（原 T5 卡改档）。
+        bool bCloudSolidUnlocked = false;
+        bool bCloudFluidUnlocked = false;
+        bool bShardMilestoneUnlocked = false;
+        {
+            UWorld* World = RM->GetWorld();
+            const AFGSchematicManager* SM = World ? AFGSchematicManager::Get(World) : nullptr;
+            if (SM)
+            {
+                bCloudSolidUnlocked     = SM->IsSchematicPurchased(UWTUpgradeCloudSolidMilestone::StaticClass());
+                bCloudFluidUnlocked     = SM->IsSchematicPurchased(UWTUpgradeCloudFluidMilestone::StaticClass());
+                bShardMilestoneUnlocked = SM->IsSchematicPurchased(UWTUpgradePowerShardMilestone::StaticClass());
+            }
+        }
+
         TArray<TSubclassOf<UFGRecipe>> Wanted;
-        // ★0.2.56（用户定案）：整个 mod 只保留「无线终端 + 强化碎片」两样，5 个升级建筑（大仓库/云端站/加速器）
-        // 从 mod 彻底移除。★1.0.11 例外：超级蓄电池（UWTUpgradePowerStorageRecipe）恢复，改由 T3 存储里程碑
-        // 发放，此处纳入读档补发清单（门槛=已购 T3，见下方循环）。强化碎片需其合成配方才能造，故
-        // PowerShard + PowerShardSynth 一并保留（即「强化碎片」这一样东西）。
-        Wanted.Add(URemote_FactoryEquipRecipe::StaticClass());        // 终端：仍受 T1 门槛约束
+        Wanted.Add(URemote_FactoryEquipRecipe::StaticClass());        // 终端：T1 门槛
         // ★1.0.11：超级蓄电池配方经 T3 存储里程碑发放；此处纳入读档补发（门槛=已购 T3，不提前到 T1）。
         Wanted.Add(UWTUpgradePowerStorageRecipe::StaticClass());
-        // ★0.2.134 闸门（WT_FEATURE_POWER_SHARD）：关=碎片两条不入 Wanted ⇒ 读档不再无条件补发，
-        // 制作台/构造机/量子编码器里不会出现（配合上面 Retired 的 prune，老存档也干净）。
+        // ★2026-11-05：碎片三条配方改由 T9 卡发放（原 T5 卡改档；不再跟 T1 一起给）。
         if (WT_FEATURE_POWER_SHARD)
         {
             Wanted.Add(UWTUpgradePowerShardRecipe::StaticClass());        // 强化碎片① 构造机
             Wanted.Add(UWTUpgradePowerShardSynthRecipe::StaticClass());   // 强化碎片② 量子编码器（0.2.39）
+            Wanted.Add(UWTUpgradePowerShardBenchRecipe::StaticClass());   // 强化碎片③ 制作台（★1.0.7）
         }
-        // ★0.2.56：MAM 研究树（WT_GetAllResearchTrees 已返回空）不再发放任何 WT 科技；升级建筑（大仓库/
-        // 云端站/加速器）三处（里程碑/MAM 树/Wanted）均已去除。★1.0.11 例外：超级蓄电池改由 T3 存储里程碑
-        // 发放（里程碑处重新列该配方 + 上方 Wanted 读档补发），MAM 仍不恢复（用户定案）。
+        // ★2026-11-05：云端四站不再随 T1 发放 —— 固体两站看 T5 卡、液体两站看 T7 卡。
+        if (WT_FEATURE_CLOUD_STATIONS)
+        {
+            Wanted.Add(UWTUpgradeStorageRecipe::StaticClass());              // ① 云端储存上传站（固体）→ T5
+            Wanted.Add(UWTUpgradeCloudDownloaderRecipe::StaticClass());      // ② 云端储存下载站（固体）→ T5
+            Wanted.Add(UWTUpgradeCloudFluidUploaderRecipe::StaticClass());   // ③ 云端流体上传站 → T7
+            Wanted.Add(UWTUpgradeCloudFluidDownloaderRecipe::StaticClass()); // ④ 云端流体下载站 → T7
+        }
 
         TArray<TSubclassOf<UFGRecipe>> Missing;
         for (const TSubclassOf<UFGRecipe>& C : Wanted)
@@ -2252,16 +2884,39 @@ namespace Remote_FactoryUpgrades
             {
                 continue;
             }
-            // 装备配方仅在 T1 已解锁时补发；强化碎片两条配方无视门槛、始终补发；
-            // 超级蓄电池仅在「T3 存储里程碑已购」时补发（不提前到 T1）。
+            // 每条配方按**各自的卡**判门槛（2026-11-05 分档后）：
+            //   终端                   → T1「智能工厂」
+            //   超级蓄电池             → T3「超级蓄电池」
+            //   云端固体两站           → T5「云端储存（固体）」
+            //   云端液体两站           → T7「云端储存（液体）」
+            //   强化碎片三条           → T9「强化能量碎片」
+            // ★别把 UWTUpgradeStorageRecipe（云端上传站）和 UWTUpgradePowerStorageRecipe（超级蓄电池）
+            //   搞混 —— 名字只差一个 Power，走的是完全不同的两张卡。
             const bool bIsShard = (C == UWTUpgradePowerShardRecipe::StaticClass())
-                               || (C == UWTUpgradePowerShardSynthRecipe::StaticClass());
-            const bool bIsStorage = (C == UWTUpgradePowerStorageRecipe::StaticClass());
-            if (bIsStorage)
+                               || (C == UWTUpgradePowerShardSynthRecipe::StaticClass())
+                               || (C == UWTUpgradePowerShardBenchRecipe::StaticClass());
+            const bool bIsPowerStorage = (C == UWTUpgradePowerStorageRecipe::StaticClass());
+            const bool bIsCloudSolid = (C == UWTUpgradeStorageRecipe::StaticClass())
+                                    || (C == UWTUpgradeCloudDownloaderRecipe::StaticClass());
+            const bool bIsCloudFluid = (C == UWTUpgradeCloudFluidUploaderRecipe::StaticClass())
+                                    || (C == UWTUpgradeCloudFluidDownloaderRecipe::StaticClass());
+            if (bIsPowerStorage)
             {
                 if (!bStorageMilestoneUnlocked) continue;
             }
-            else if (!bT1Unlocked && !bIsShard)
+            else if (bIsShard)
+            {
+                if (!bShardMilestoneUnlocked) continue;
+            }
+            else if (bIsCloudSolid)
+            {
+                if (!bCloudSolidUnlocked) continue;
+            }
+            else if (bIsCloudFluid)
+            {
+                if (!bCloudFluidUnlocked) continue;
+            }
+            else if (!bT1Unlocked)
             {
                 continue;
             }
@@ -2310,6 +2965,48 @@ namespace Remote_FactoryUpgrades
         else
         {
             WT_WARNF(TEXT("[upgrade] UWTUpgradeAcceleratorMilestone CDO missing."));
+        }
+
+        // ★1.0.7 强化碎片里程碑（★2026-11-05 改档 T5 → T9）：成本/类目/解锁链在这里填。
+        // 与上面两张卡同一套写法 —— 独立 try，一张失败不影响其它几张。
+        if (UWTUpgradePowerShardMilestone* M = GetMutableDefault<UWTUpgradePowerShardMilestone>())
+        {
+            const FString Status = M->InstallCostAndUnlock();
+            if (!Status.IsEmpty())
+            {
+                WT_WARNF(TEXT("[upgrade] power shard milestone setup incomplete: %s"), *Status);
+            }
+        }
+        else
+        {
+            WT_WARNF(TEXT("[upgrade] UWTUpgradePowerShardMilestone CDO missing."));
+        }
+
+        // ★2026-11-05 新增两张云端卡（T5 固体 / T7 液体）。同上一套写法，各自独立判空。
+        if (UWTUpgradeCloudSolidMilestone* M = GetMutableDefault<UWTUpgradeCloudSolidMilestone>())
+        {
+            const FString Status = M->InstallCostAndUnlock();
+            if (!Status.IsEmpty())
+            {
+                WT_WARNF(TEXT("[upgrade] cloud solid milestone setup incomplete: %s"), *Status);
+            }
+        }
+        else
+        {
+            WT_WARNF(TEXT("[upgrade] UWTUpgradeCloudSolidMilestone CDO missing."));
+        }
+
+        if (UWTUpgradeCloudFluidMilestone* M = GetMutableDefault<UWTUpgradeCloudFluidMilestone>())
+        {
+            const FString Status = M->InstallCostAndUnlock();
+            if (!Status.IsEmpty())
+            {
+                WT_WARNF(TEXT("[upgrade] cloud fluid milestone setup incomplete: %s"), *Status);
+            }
+        }
+        else
+        {
+            WT_WARNF(TEXT("[upgrade] UWTUpgradeCloudFluidMilestone CDO missing."));
         }
     }
 
@@ -2404,6 +3101,57 @@ namespace Remote_FactoryUpgrades
                 R->ApplyIngredients();
             }
             // Recipe2 / Recipe3 是退役空壳：**不要**调用它们（它们没有 Apply* 接口，构造体也刻意留空）。
+
+            // ★1.0.7 ③ 制作台（手工台）：2 × 原版碎片 → 1 × 强化碎片。
+            //   制作台侧 producer 判据挂在建筑类与工作台组件上，不是普通机器那一套 ⇒
+            //   由 WT_FindCraftBenchProducers 给候选人（建筑类 / 工作台组件；★1.0.7w 起
+            //   物品描述符已被拒绝，见该函数注释 —— 它不实现 IFGRecipeProducerInterface，写进去会崩）。
+            //   全失败时保留构造函数里的两条软路径 —— 清空 mProducedIn 会让配方无声消失。
+            {
+                TArray<UClass*> Benches;
+                WT_FindCraftBenchProducers(Benches);
+                if (Benches.Num() == 0)
+                {
+                    WT_WARNF(TEXT("[shard] craft bench producers unresolved -- recipe3 keeps soft paths only."));
+                }
+                if (UWTUpgradePowerShardBenchRecipe* R = Cast<UWTUpgradePowerShardBenchRecipe>(
+                        UWTUpgradePowerShardBenchRecipe::StaticClass()->GetDefaultObject()))
+                {
+                    R->ApplyProducedIn(Benches);
+                    R->ApplyIngredients();
+                }
+
+                // ★1.0.7 绑定探针（每次进档一次，Warning 级不会被编译剔除）：
+                // 对每个候选 producer 反查「它能生产多少配方」。原版手工配方全挂在制作台上，
+                // 所以命中那一类的数量必然 > 0 —— 哪一行不为 0，就说明 mProducedIn 该写哪一类。
+                // 同一行里再打出我们配方自己的 producer 列表，一眼看出填没填对。
+                for (UClass* C : Benches)
+                {
+                    TArray<TSubclassOf<UFGRecipe>> Producible;
+                    RM->GetAvailableRecipesForProducer(C, Producible);
+                    // ★1.0.7w 同时打「是否实现接口」：只打命中数是看不出来的 —— Desc_WorkBench_C
+                    //   当年也报 1 条（因为它就在我们自己的配方列表里，反查必然命中自己），
+                    //   假阳性让「描述符可用」这个错判活了好几版。
+                    WT_WARNF(TEXT("[shard-probe] producer %s -> %d producible recipes | implements=%d"),
+                             *C->GetName(), Producible.Num(),
+                             C->ImplementsInterface(UFGRecipeProducerInterface::StaticClass()) ? 1 : 0);
+                }
+                if (UWTUpgradePowerShardBenchRecipe* R = Cast<UWTUpgradePowerShardBenchRecipe>(
+                        UWTUpgradePowerShardBenchRecipe::StaticClass()->GetDefaultObject()))
+                {
+                    TArray<TSubclassOf<UObject>> OurProducers;
+                    R->GetProducedIn(OurProducers);
+                    WT_WARNF(TEXT("[shard-probe] recipe3 mProducedIn = %d entries (available=%d)"),
+                             OurProducers.Num(),
+                             RM->IsRecipeAvailable(UWTUpgradePowerShardBenchRecipe::StaticClass()) ? 1 : 0);
+                    for (const TSubclassOf<UObject>& P : OurProducers)
+                    {
+                        // TSubclassOf 没有 operator bool，用 Get() 判空（否则 MSVC C2676）。
+                        WT_WARNF(TEXT("[shard-probe]   producer entry: %s"),
+                                 P.Get() ? *P->GetPathName() : TEXT("NULL"));
+                    }
+                }
+            }
         }
 
         // ★0.2.59b 修复：原版能量碎片镜像源错误。
@@ -2436,11 +3184,15 @@ namespace Remote_FactoryUpgrades
         {
             const bool bR1 = RM->IsRecipeAvailable(UWTUpgradePowerShardRecipe::StaticClass());
             const bool bR2 = RM->IsRecipeAvailable(UWTUpgradePowerShardSynthRecipe::StaticClass());
-            if (!(bR1 && bR2))
+            const bool bR3 = RM->IsRecipeAvailable(UWTUpgradePowerShardBenchRecipe::StaticClass());
+            if (!(bR1 && bR2 && bR3))
             {
-                WT_WARNF(TEXT("[shard] shard recipes NOT fully available (constructor=%d encoder=%d) -- "
-                              "locked until the WT T1 milestone is purchased at the HUB (Tier 1)."),
-                         bR1 ? 1 : 0, bR2 ? 1 : 0);
+                // ★★2026-11-05 改档纠偏：碎片三条配方已从 T1 搬到 **T9**（用户定案「强化能量碎片放到 T9」）。
+                // 买 T9 卡前本来就该缺，属正常；买 T9 后仍缺才是问题。
+                //（旧文案写「expected until the T1 milestone」是搬档前的，已被实测日志误导过一次，必须改掉。）
+                WT_WARNF(TEXT("[shard] shard recipes not all available yet (bench=%d constructor=%d encoder=%d) -- "
+                              "expected until the T9 milestone (Enhanced Power Shard, Tier 9) is purchased at the HUB."),
+                         bR3 ? 1 : 0, bR1 ? 1 : 0, bR2 ? 1 : 0);
             }
         }
 

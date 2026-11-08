@@ -32,9 +32,55 @@ class UFGUnlockRecipe;
  *      （连同 CONSTRUCTION 阶段的售价/发货数据填充一并跳过）。
  *
  * ★v1.0.0 正式发布：把下面的 false 改回 true，四处同时恢复，无需动任何配方定义。
+ * ★★1.0.7（2026-10-26 已翻）：实测 1.0.6 包内碎片里程碑/商店/配方三样全缺，日志
+ *    `[wt-diag] ... T5accel=0` + `[ms-dump]` 只有 T1/T3storage/T5accel 三条 ⇒ 本闸门仍是 false，
+ *    上一轮加在 `if (WT_FEATURE_POWER_SHARD)` 里的注册/补发全是死代码。已改为 true。
+ *    注意：闸门 false 期间每局读档都会把碎片配方 prune 掉（Retired 分支），老存档里原有的
+ *    碎片配方条目已被清空，翻闸后靠 `WT_RepairRecipeAvailability` 的 Wanted 补发重新长回来。
+ * ★★最终形态（用户同日改口「算了，跟终端放一起吧」）：碎片三条配方不再单开 T5 卡，而是和
+ *    手持终端同一张 T1「智能工厂」里程碑一起发放（`URemote_FactoryMilestone::AddUnlockRecipes`）；
+ *    `UWTUpgradePowerShardMilestone` 类保留编译与 CDO 配置但**不注册**。⇒ 测试流程 =
+ *    买 T1 卡（若还没买）→ 三条配方同时出现，无需再去 T5 找卡。
  */
-constexpr bool WT_FEATURE_POWER_SHARD = false;
+constexpr bool WT_FEATURE_POWER_SHARD = true;
 
+/**
+ * ★1.0.7 云端站总闸（用户 2026-10-26「顺便把四个云端一起写进去」→ 同日追加「先把云端液体的移除，
+ * 这个先不修」⇒ **本版已彻底移除云端液体两台站**，仅保留固体两台）。
+ *
+ * 两台建筑（0.2.36 建成、0.2.56 起随升级建筑一起下架，1.0.7 恢复发放）：
+ *   ① UWTUpgradeStorageRecipe             → Cloud Storage Upload Station   云端储存上传站（固体上传）★本版开放
+ *   ② UWTUpgradeCloudDownloaderRecipe     → Cloud Storage Download Station 云端储存下载站（固体下载）★本版开放
+ *
+ * 发放口径与强化碎片**完全一致**：随 T1「智能工厂」里程碑（URemote_FactoryMilestone）一次给齐，
+ * 不单开卡、不进 MAM。三处引用点必须同步（缺一处就会出现「里程碑给了但读档被 prune」或反之）：
+ *   ① Remote_FactoryRegistry.cpp  URemote_FactoryMilestone::AddUnlockRecipes（买卡时发放）
+ *   ② Remote_FactoryUpgradeRegistry.cpp  WT_RepairRecipeAvailability 的 Live（防 prune）
+ *   ③ 同上函数的 Wanted（读档补发，门槛 = bT1Unlocked）
+ *
+ * 配方成本与「进建造枪」的填充（ApplyIngredients / ApplyProducedIn）**不在闸门内** ——
+ * 它们在 RegisterUpgradeRecipes 里无条件执行，关闸只是不发解锁，不会让配方变成无料白送。
+ * 成本口径：原版位面存储站同序料单 + 1 块强化碎片（⇒ 本闸门隐含依赖 WT_FEATURE_POWER_SHARD，
+ * 碎片拿不到就造不出云端站，这是设计意图，不是 bug）。
+ */
+constexpr bool WT_FEATURE_CLOUD_STATIONS = true;
+
+/**
+ * ★1.0.8AO 云端**液体**两台单开关 —— **重新开放**（用户 2026-10-28「流体也发放了，现在，修流体」）。
+ *
+ * 历史：1.0.7 曾按用户「先把云端液体的移除，这个先不修」关成 false（只发固体两台）。
+ * 本版连带把「流体为什么不能用」修掉后重新打开：
+ *   ① 上传站 / 下载站原先**每 2 秒才调一次** `Factory_Pull/PushPipeInput`，却传的是**帧 dt**
+ *      （≈0.016s）—— 原版内部按 `流量 × dt` 结算时间债，等于每 2 秒只认 1/125 的量
+ *      ⇒ 接上管子也一滴都过不去。现改为**每帧调用 + 真实 dt**（原版所有管道建筑的惯例，
+ *      精炼厂/萃取机都是每帧一次）。
+ *   ② 下载站选型面板原先**只读原版云端池**，可上传站的液体按 0.2.36b 定案是记在
+ *      **我们自己的账本**里、从不进原版池 ⇒ 面板永远「云端没有液体」⇒ 选不了型 ⇒ 整台死锁。
+ *      现改为「各上传站账本汇总 + 原版池液体」合并成目录。
+ *
+ * ★排除的假设（别再走一次）：一度怀疑是「SML 的 FactoryGame 是空桩 ⇒ 管道函数不可用」。
+ *   实测证伪 —— 解析 mod DLL 的 PE 导入表可见 `?Factory_PullPipeInput@UFGPipeConnectionComponent@@...`
+ *   与 `?GetFluidBox@AFGBuildablePipeReservoir@@...` 都**从游戏 DLL 导入**（`Private
 /**
  * ★0.2.139 MAM 升级研究总闸（用户定案：v1.0.0 之前，MAM 科技全部下架）。
  *
@@ -54,10 +100,18 @@ constexpr bool WT_FEATURE_POWER_SHARD = false;
  *   因为 URemote_FactoryGameWorldModule::WT_GetAllResearchTrees()（Remote_FactoryResearchTree.cpp）
  *   自 0.2.56 起固定返回空数组、没有挂在本闸门上。要让 MAM 里真正出现「智能工厂」研究树，
  *   必须同时让 WT_GetAllResearchTrees() 返回 UWTResearchTreeMerged（或把该函数也挂到本闸门）。
- *   另：0.2.138 起末段 Boost 路线（L17~L20）另受 WT_FEATURE_POWER_SHARD 约束，
- *   v1.0.0 若只想恢复常规路线、继续下架碎片，可只翻本闸门而保持 POWER_SHARD=false。
+ * ★★2026-11-05 用户定案：**MAM 研究树上架**（同轮定的三件事）：
+ *   ① 「走第二条路」⇒ 建筑不再靠 T1 卡，按 HUB 层级分档发放
+ *      （T5 云端固体 / T7 云端液体 / T9 强化能量碎片，见 UpgradeRegistry 的三张卡）；
+ *   ② 「成本表不要动，这个最开始定好的」⇒ GStageItemPath / GStageBaseAmount / GLevelMult 一律不动；
+ *   ③ 「云端的问题最后修（这个云端最麻烦）」⇒ 容量轨的云端配额加成
+ *      （CloudQuota.h `WT_FEATURE_CLOUD_QUOTA_MAM`）仍是 false，留到最后单独一轮接。
+ *   ⇒ 结论：MAM 树这一版**只做加成**（储能倍率 / 碎片参数 / 云端配额），不再发放建筑配方。
+ *   必须同时成立的两件事（漏一件 = MAM 里依旧什么都没有）：
+ *     A. 本开关 = true（否则 56 条不进 mSchematics，SchematicManager 里查不到）；
+ *     B. WT_GetAllResearchTrees() 返回 UWTResearchTreeMerged（已同步改，ResearchTree.cpp）。
  */
-constexpr bool WT_FEATURE_MAM_RESEARCH = false;
+constexpr bool WT_FEATURE_MAM_RESEARCH = true;
 
 /**
  * Building descriptor for the Remote Factory. This is the "item" form the build gun holds:

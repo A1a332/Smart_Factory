@@ -127,7 +127,9 @@ public:
     UWTUpgradeCloudDownloaderDescriptor();
 };
 
-/** 云端液态上传站（★0.2.36 新增）：管道流体 -> 云端池的入口。 */
+
+
+/** 云端流体上传站（★恢复：把本地管网流体吸入、记入我们自己的液态账本云）。 */
 UCLASS()
 class REMOTE_FACTORY_API UWTUpgradeCloudFluidUploaderDescriptor : public UWTUpgradeDescriptorBase
 {
@@ -136,7 +138,7 @@ public:
     UWTUpgradeCloudFluidUploaderDescriptor();
 };
 
-/** 云端液态下载站（★0.2.36 新增）：云端池 -> 管网流体的出口（面板选型）。 */
+/** 云端流体下载站（★恢复：从液态账本云把流体排进本地管网）。 */
 UCLASS()
 class REMOTE_FACTORY_API UWTUpgradeCloudFluidDownloaderDescriptor : public UWTUpgradeDescriptorBase
 {
@@ -144,6 +146,8 @@ class REMOTE_FACTORY_API UWTUpgradeCloudFluidDownloaderDescriptor : public UWTUp
 public:
     UWTUpgradeCloudFluidDownloaderDescriptor();
 };
+
+
 
 /** 产能加速器 -- standing production boost. */
 UCLASS()
@@ -384,6 +388,50 @@ public:
 };
 
 /**
+ * ★1.0.7 强化能量碎片 · 制作台（手工台）配方 —— 用户 2026-10-26 定案新增第三条渠道：
+ *   **制作台/手工台里 2 × 原版能量碎片 → 1 × 强化碎片**（与构造机同比例，但手搓 6s）。
+ *
+ * ## 为什么材料表写死不镜像
+ * 构造机那条（① UWTUpgradePowerShardRecipe）要镜像原版碎片类（`WT_FindVanillaShardClass`），
+ * 因为原版可能改材料；这条的材料就是「2 块原版碎片」，与原版数值无关，只需解析到原版碎片类即可。
+ *
+ * ## mProducedIn 挂「两类」候选，而不是一个类（一手核实 FGRecipe.h:181 / FGWorkBench.h:16,28）
+ * 手工制作台与普通机器不是同一套 producer 判据：
+ *   * 普通机器 → 建筑类（构造机/编码器就是这条，已实测可用）；
+ *   * 手工制作台 → `UFGWorkBench` 是**组件**（`class UFGWorkBench : public USceneComponent,
+ *     public IFGRecipeProducerInterface`）。
+ * 因此 ApplyProducedIn 收的是候选集合，由 `WT_FindCraftBenchProducers` 给出：
+ * ① `Build_WorkBench_C` / `Build_WorkBenchIntegrated_C`（建筑类）；
+ * ② 工作台组件 BP 类（`BP_WorkBenchComponent_C`，UFGWorkBench 子类）。
+ * 命中哪一套由日志 `[shard-probe]` 给出 —— 那是 `AFGRecipeManager::GetAvailableRecipesForProducer`
+ * 反查出来的实证，不靠猜。
+ *
+ * ★★1.0.7w 删除原第 ② 项「建筑物品描述符 `Desc_WorkBench_C`」：
+ *   `mProducedIn` 带 `Meta=(MustImplement="FGRecipeProducerInterface")`（FGRecipe.h:180-181），
+ *   而 UFGItemDescriptor 子类**不实现**该接口。原版物品 tooltip 遍历产物的 mProducedIn 时
+ *   直接 `IFGRecipeProducerInterface::Execute_GetRecipeProducerItemDescriptor(Class->GetDefaultObject())`，
+ *   其内部第一行就是 `checkf(ImplementsInterface(...))`（FGRecipeProducerInterface.gen.cpp:46）
+ *   ⇒ 2026-10-27 10:52 玩家鼠标掠过强化碎片时游戏 Assert 崩溃（崩溃包实证）。
+ *   「RecipeManager 反查不崩」是真的，但那只说明**一条路径**不崩，不能推广到全部调用方。
+ *   现在候选与软路径都只留实现接口的类；ApplyProducedIn 内再做一次接口过滤作为双保险。
+ *
+ * ⚠ 若全部解析失败（资产改名/缺失），ApplyProducedIn 保留构造函数里的两条软路径，
+ * 由引擎在加载配方时自己解析 —— 绝不清空 mProducedIn（清空 = 配方不属于任何机器 =
+ * 玩家永远看不到，而且不报错）。
+ */
+UCLASS()
+class REMOTE_FACTORY_API UWTUpgradePowerShardBenchRecipe : public UFGRecipe
+{
+    GENERATED_BODY()
+public:
+    UWTUpgradePowerShardBenchRecipe();
+
+    /** 允许一次挂多台制作台（独立制作台 + 枢纽内置制作台）。 */
+    void ApplyProducedIn(const TArray<UClass*>& ProducerClasses);
+    void ApplyIngredients();
+};
+
+/**
  * Shared plumbing for the two upgrade milestones.
  *
  * ★ v0.2.2 -- the single tier-4 "Upgrade Kit" milestone was split. One purchase for three
@@ -461,6 +509,89 @@ public:
     UWTUpgradeAcceleratorMilestone();
 
     /** Convenience wrapper: builds the cost array from the tier-5 table, then installs. */
+    FString InstallCostAndUnlock();
+};
+
+/**
+ * ★1.0.7 强化能量碎片 · HUB 里程碑（T5）—— 用户 2026-10-26 定案「放置在 T5 解锁」。
+ *
+ * ## 为什么要从 T2「智能工厂」里程碑里搬出来
+ * v1.0.6 及以前：碎片三条配方跟着 T2 里程碑（20 铁棒 + 30 螺丝 + 10 铜板）一起发放 ——
+ * 那时碎片只是「终端附件」，早给无所谓。用户定案碎片要成为独立科技线并放到 T5：
+ *   * 门槛与强度匹配：碎片每片 +100%（原版 0.5）、上限抬到 500%，给得太早会让 T2~T4 的产线
+ *     平衡整个失效；
+ *   * T5 同时是石油处理档，玩家已有塑料/橡胶/模块化框架，配得上这张卡的造价。
+ *
+ * ## 兼容性（老存档）
+ * `AFGRecipeManager::mAvailableRecipes` 是 UPROPERTY(SaveGame) 且**只增不减** ⇒ 已买过 T2
+ * 里程碑的存档里那两条配方本来就在，本次改动**不会**把它们收回（也收不回，只能靠
+ * WT_RepairRecipeAvailability 主动 prune，而它们不是退役配方）。⇒ 老存档玩家继续能造，
+ * 新存档必须买 T5 卡。
+ *
+ * ⚠ 本类派生自 UWTUpgradeMilestoneBase，**必须**保持如此：mCost / mUnlocks 的写入逻辑在基类
+ * 里，基类已由 Config/AccessTransformers.ini 授权（Friend=(Class="UFGSchematic",
+ * FriendClass="UWTUpgradeMilestoneBase")）。把写入逻辑抄到子类会 C2248（友谊不继承）。
+ */
+/**
+ * ★1.0.7 强化能量碎片 · HUB 里程碑 —— **★2026-11-05 改档到 T9**（用户定案）。
+ *
+ * 历史上这张卡经历过两次定位：v1.0.6 及以前跟 T1「智能工厂」卡一起发；1.0.7 首版独立成 T5 卡
+ * （见下方历史注释），随后又改回「跟终端放一起」。2026-11-05 用户重新定案分档：
+ *   T5 = 云端固体两站（上传 + 下载） / T7 = 云端液体两站 / **T9 = 强化能量碎片**。
+ *
+ * ⚠ 类名与文件位置保持不变（**绝不删类**）：老存档的 `mAvailableRecipes`（SaveGame，只增不减）
+ *   里可能已经存过 `UWTUpgradePowerShard*Recipe` 的类引用，删类会让反序列化落到空指针上直接崩
+ *   （0.2.37 踩过，见 WT_RepairRecipeAvailability 顶部注释）。所以是**改档位**，不是删了重建。
+ *
+ * ## 兼容性（老存档）
+ * 已买过旧卡 / 旧 T1 的存档里配方本来就在 `mAvailableRecipes` 里，本次改动不会回收
+ * （它们不是退役配方，不进 Retired）⇒ 老档玩家照常能造；新档必须买 T9 卡。
+ */
+UCLASS()
+class REMOTE_FACTORY_API UWTUpgradePowerShardMilestone : public UWTUpgradeMilestoneBase
+{
+    GENERATED_BODY()
+public:
+    UWTUpgradePowerShardMilestone();
+
+    /** Cost = T9 档（见 cpp 的 GMilestoneCostPowerShard）；Unlock = 碎片三条配方。 */
+    FString InstallCostAndUnlock();
+};
+
+/**
+ * ★2026-11-05 新增 · T5「云端固体」里程碑 —— 解锁 云端储存上传站（固体）+ 云端储存下载站（固体）。
+ *
+ * 为什么单独开卡（用户定案「云端固体放到 T5」）：1.0.7 把四个云端站并进了 T1「智能工厂」卡，
+ * 等于开局就能造，与「云端是后期基建」的定位冲突。现按固体 / 液体拆成两张卡、分挂 T5 / T7。
+ *
+ * ⚠ 本类同样必须派生 `UWTUpgradeMilestoneBase`：mCost / mUnlocks 的写入在基类里，
+ *   AccessTransformers.ini 只对该基类放行（抄到子类会 C2248，友谊不继承）。
+ */
+UCLASS()
+class REMOTE_FACTORY_API UWTUpgradeCloudSolidMilestone : public UWTUpgradeMilestoneBase
+{
+    GENERATED_BODY()
+public:
+    UWTUpgradeCloudSolidMilestone();
+
+    /** Cost = T5 档（GMilestoneCostCloudSolid）；Unlock = 上传站 + 下载站。 */
+    FString InstallCostAndUnlock();
+};
+
+/**
+ * ★2026-11-05 新增 · T7「云端液体」里程碑 —— 解锁 云端流体上传站 + 云端流体下载站。
+ *
+ * 拆卡理由同上一张。造价用 T4/T6 件（自动化线缆 / 模块化引擎）：T7 与 T6 由同一次太空电梯
+ * 阶段开放，和 T5 卡用 T6 件是同一套口径（用户已确认接受这种相邻档容忍）。
+ */
+UCLASS()
+class REMOTE_FACTORY_API UWTUpgradeCloudFluidMilestone : public UWTUpgradeMilestoneBase
+{
+    GENERATED_BODY()
+public:
+    UWTUpgradeCloudFluidMilestone();
+
+    /** Cost = T7 档（GMilestoneCostCloudFluid）；Unlock = 流体上传 + 流体下载。 */
     FString InstallCostAndUnlock();
 };
 

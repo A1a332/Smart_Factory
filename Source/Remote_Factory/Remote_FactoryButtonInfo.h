@@ -15,7 +15,16 @@ enum class EWT_ButtonKind : uint8
     /** ★0.2.62: a top-level group toggle (建筑 / 容器 / 外星科技). Index = group id (0..2). */
     TopToggle,
     /** ★0.2.62: an alien-energy KIND selector (Power Slug / Mercer Sphere / ...). Index = EWT_CollectibleKind. */
-    CollectibleKind
+    CollectibleKind,
+    // ★1.0.8 移除 NodePurity / ProdStateFilter 两个 kind：
+    // 它们是为「横排互斥按钮」形态准备的，用户定案改「下选箭头」后筛选一律走 UComboBoxString，
+    // 再也没有任何代码会生成这两种按钮 ⇒ 留着就是「点了没反应」的死枚举，直接删。
+    // 枚举值 5/6 保留空号不复用（无存档/网络序列化依赖，纯 UI 瞬时结构）。
+
+    /** ★1.0.9 【电网】类目里的一条电路行（点它切换上方曲线）。
+     *  Index = FWT_MachineListReply::Grids 的下标 —— 那是服务端扫描时按 UFGPowerCircuit
+     *  去重生成的数组，不是 Entries 的下标，别混用。 */
+    GridRow
 };
 
 /**

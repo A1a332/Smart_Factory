@@ -27,14 +27,15 @@ or from the editor Output Log:  py "<path-to-this-file>"
 
 ASSET LOCATION
 --------------
-Mod content mounts at /Remote_Factory/, so the asset lands in
-Mods/Remote_Factory/Content/Research/BP_WT_ResearchNode.uasset and is cooked
+Mod content mounts at /Smart_Factory/ (cook-time PackageStore fixes this
+package name; see Remote_FactoryModule.cpp:42-48), so the asset lands in
+Mods/Smart_Factory/Content/Research/BP_WT_ResearchNode.uasset and is cooked
 by Alpakit into the mod. The C++ LoadClass path is
-/Remote_Factory/Research/BP_WT_ResearchNode.BP_WT_ResearchNode_C
+/Smart_Factory/Research/BP_WT_ResearchNode.BP_WT_ResearchNode_C
 """
 import unreal
 
-MOD_MOUNT = "/Remote_Factory"
+MOD_MOUNT = "/Smart_Factory"
 NODE_DIR = MOD_MOUNT + "/Research"
 NODE_NAME = "BP_WT_ResearchNode"
 NODE_PATH = NODE_DIR + "/" + NODE_NAME
