@@ -1,8 +1,8 @@
 {
     "FileVersion": 3,
     "Version": 1,
-  "VersionName": "1.0.7",
-  "SemVersion": "1.0.7",
+  "VersionName": "1.0.8",
+  "SemVersion": "1.0.8",
     "GameVersion": ">=502094",
     "FriendlyName": "Smart Factory",
     "Description": "Smart Factory console. Place a Wireless Terminal and, without walking anywhere, browse every machine, resource node and collectible in the world by category - open any machine UI, pull its output, and teleport to any of them. Ships a pre-scanned map database (507 resource nodes: ore nodes, geysers and resource well cores) with purity filtering, milestone ordering and a built-in search box, plus a hub shortcut bar for the terminal, workbench, MAM, AWESOME store and Space Elevator. Modded buildings and modded nodes are grouped under their own mod name. Landing spots are always safe: in front of the building, never inside geometry or inside vehicles/flyers.",
@@ -41,10 +41,6 @@
             "Name": "SmartFactoryLib",
             "Enabled": true,
             "SemVersion": "^1.0.1"
-        },
-        {
-            "Name": "GeometryScripting",
-            "Enabled": true
         }
     ],
     "LocalizationTargets": [

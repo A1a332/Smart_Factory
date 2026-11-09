@@ -4469,9 +4469,12 @@ static void WT_PreStreamDestination(UWorld* World, const FVector& Dest)
         return;
     }
     // TargetState 是私有字段（默认即 Activated），无需也不允许直接赋值；Enable 后 GetStreamingSource 取 Activated
+    // ★★2026-11-10 崩溃根治：RegisterComponent() 内部 ExecuteRegisterEvents→OnRegister() 已自动
+    //   RegisterStreamingSourceProvider(this)（引擎 WorldPartitionStreamingSourceComponent.cpp:40）。
+    //   这里再手动注册一次 → 日志 "Streaming source provider already registered."（Sets.Add 失败，
+    //   bIsAlreadyInSet=true，但元素仍在 Set 里）。绝对不能改回手动注册。
     Src->RegisterComponent();
     Src->EnableStreamingSource();
-    WPS->RegisterStreamingSourceProvider(Src);  // 显式注册，确保被收集
     WPS->OnUpdateStreamingState();               // 强制重算流式状态，开始加载目的地格子
 
     FWorldPartitionStreamingQuerySource Query(Dest);
@@ -4493,7 +4496,13 @@ static void WT_PreStreamDestination(UWorld* World, const FVector& Dest)
     WT_WARNF(TEXT("[teleport-prestream] dest=%s preloaded=%d"), *Dest.ToString(), bPreloaded ? 1 : 0);
 
     // 清理临时源（玩家随即落点，自身即为该处流式源，格子不会立刻卸载）
-    WPS->UnregisterStreamingSourceProvider(Src);
+    // ★★2026-11-10 崩溃根治：绝对不能手动 WPS->UnregisterStreamingSourceProvider(Src)！
+    //   Shipping 断言 :58 `verify(WorldPartitionSubsystem->UnregisterStreamingSourceProvider(this))`
+    //   在 UWorldPartitionStreamingSourceComponent::OnUnregister() 里；DestroyComponent() →
+    //   BeginDestroy → ExecuteUnregisterEvents → OnUnregister 会自己注销一次。
+    //   若我们先手动注销，Set 里已无此指针 → OnUnregister 的 verify 返回 false →
+    //   正式版直接 appError 崩溃（日志实锤：先 "already registered"，紧接着 :58 断言）。
+    //   注册/注销全部交给组件自身生命周期，这里只销毁。
     Src->DestroyComponent();
     Temp->Destroy();
 }
